@@ -1,12 +1,13 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom"
 import LoginPage from "@/pages/LoginPage"
+import SignupPage from "@/pages/SignupPage"
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<LoginPage />} />
-        {/* Add routes for /signup and /forgot-password later */}
+        <Route path="/signup" element={<SignupPage />} />
       </Routes>
     </BrowserRouter>
   )
