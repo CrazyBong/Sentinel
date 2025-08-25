@@ -1,0 +1,13 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+@config "../tailwind.config.js";
+
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
+/* optional: smooth font rendering */
+body {
+  font-family: 'Inter', sans-serif;
+}
