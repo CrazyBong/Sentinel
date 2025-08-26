@@ -1,3 +1,4 @@
+// eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion"
 import LoginForm from "@/components/LoginForm"
 import Logo from "@/assets/logo.png"

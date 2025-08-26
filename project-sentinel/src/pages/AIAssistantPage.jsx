@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+// eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "framer-motion"
 import { Link, useNavigate } from "react-router-dom"
-import logo from "@/assets/logo.png"
+
 
 const now = () => new Date().toLocaleString()
 const fakeLLMReply = async (prompt) => {
@@ -94,6 +95,13 @@ export default function AIAssistantPage() {
     try {
       const reply = await fakeLLMReply(prompt)
       setMessages((m) => [...m, { role: "assistant", content: reply }])
+      // Add to recent conversations
+      setRecent((prev) => [{
+        id: crypto.randomUUID(),
+        title: prompt.slice(0, 48),
+        started: now(),
+        messages: [...messages, { role: "user", content: prompt }, { role: "assistant", content: reply }]
+      }, ...prev])
     } finally { setLoading(false) }
   }
   const handleKeyDown = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendPrompt() } }
