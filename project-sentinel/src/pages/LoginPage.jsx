@@ -2,7 +2,6 @@
 import { useState } from "react"
 // eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion"
-import { useNavigate } from "react-router-dom"
 import LoginForm from "@/components/LoginForm"
 import Logo from "@/assets/logo.png"
 import Pinn from "@/assets/pur1.jpeg"
