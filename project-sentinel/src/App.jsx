@@ -7,15 +7,20 @@ import SignupPage from "@/pages/SignupPage"
 import DashboardPage from "@/pages/DashboardPage"
 import AIAssistantPage from "@/pages/AIAssistantPage"
 import CampaignDetailsPage from "@/pages/CampaignDetailsPage"
+import CampaignsArchivePage from "@/pages/CampaignsArchivePage" // new archive page
 
-// Optional: only include if you really made this component
-// If not, comment this out and remove <ErrorOverlay>
-import ErrorOverlay from "@/components/ErrorOverlay"
+// Optional error boundary — include only if you've created it
+let ErrorOverlay
+try {
+
+  ErrorOverlay = require("@/components/ErrorOverlay").default
+} catch {
+  ErrorOverlay = ({ children }) => <>{children}</>
+}
 
 export default function App() {
   return (
     <BrowserRouter>
-      {/* If ErrorOverlay exists, keep it. Otherwise, remove it. */}
       <ErrorOverlay>
         <Routes>
           {/* Public routes */}
@@ -25,6 +30,7 @@ export default function App() {
           {/* App routes */}
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/assistant" element={<AIAssistantPage />} />
+          <Route path="/archive" element={<CampaignsArchivePage />} />
           <Route path="/campaigns/:id" element={<CampaignDetailsPage />} />
 
           {/* Redirects */}
