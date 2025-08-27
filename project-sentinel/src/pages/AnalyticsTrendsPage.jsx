@@ -1,6 +1,7 @@
 // src/pages/AnalyticsTrendsPage.jsx
 // eslint-disable-next-line no-unused-vars
 import AIDetectionSummary from "../components/AIDetectionSummary";
+// eslint-disable-next-line no-unused-vars
 import { useEffect, useMemo, useState, useCallback } from "react"
 // eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion"
@@ -88,21 +89,32 @@ export default function AnalyticsTrendsPage() {
   const navigate = useNavigate()
 
   // KPI
+  // eslint-disable-next-line no-unused-vars
   const [totalCampaigns, setTotalCampaigns] = useState(247)
+  // eslint-disable-next-line no-unused-vars
   const [totalDelta, setTotalDelta] = useState(+12)
+  // eslint-disable-next-line no-unused-vars
   const [activeToday, setActiveToday] = useState(38)
+  // eslint-disable-next-line no-unused-vars
   const [activeDelta, setActiveDelta] = useState(+5)
+  // eslint-disable-next-line no-unused-vars
   const [avgSeverity, setAvgSeverity] = useState(7.2)
+  // eslint-disable-next-line no-unused-vars
   const [severityDelta, setSeverityDelta] = useState(-0.5)
   const [topPlatform, setTopPlatform] = useState({ name: "Twitter", share: 62 })
 
   // Charts/widgets
   const [bucket, setBucket] = useState("month") // week | month | year
   const [series, setSeries] = useState(makeSeries())
+  // eslint-disable-next-line no-unused-vars
   const [platformDist, setPlatformDist] = useState(demoPlatformDist())
+  // eslint-disable-next-line no-unused-vars
   const [severityDist, setSeverityDist] = useState(demoSeverityDist())
+  // eslint-disable-next-line no-unused-vars
   const [narratives, setNarratives] = useState(demoNarratives())
+  // eslint-disable-next-line no-unused-vars
   const [contentTypes, setContentTypes] = useState(demoContentTypes())
+  // eslint-disable-next-line no-unused-vars
   const [aiDetection, setAiDetection] = useState(demoAIDetection())
 
   // Socket (demo wiring)
