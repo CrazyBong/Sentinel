@@ -53,7 +53,7 @@ It includes **AI-powered dashboards**, real-time updates via **Socket.IO**, and 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/<your-username>/project-sentinel.git
+git clone https://github.com/CrazyBong/Sentinel/
 cd project-sentinel
 ```
 
