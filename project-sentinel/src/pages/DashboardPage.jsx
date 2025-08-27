@@ -1,24 +1,40 @@
-// eslint-disable-next-line no-unused-vars
-import { useEffect, useMemo, useRef, useState } from "react"
+// src/pages/DashboardPage.jsx
+import { useEffect, useMemo, useState, useCallback } from "react"
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "framer-motion"
 import { useNavigate } from "react-router-dom"
-import { Twitter, Reddit, Clock } from "lucide-react"
+import { Clock } from "lucide-react"               // keep lucide only for neutral icons
 import { LineChart, Line, ResponsiveContainer } from "recharts"
 import { io } from "socket.io-client"
 
 // --- CONFIG: set your Socket.IO endpoint here ---
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3001"
 
-// map severity -> styles
+// ---------- inline brand icons (no runtime import issues) ----------
+function XIcon({ className = "w-4 h-4", ...props }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className={className} {...props}>
+      <path d="M18 2H21L13.5 10.5L22.5 22H15L10 15.5L4.5 22H1.5L9.5 13L1 2H8L12.5 8L18 2Z" />
+    </svg>
+  )
+}
+function RedditIcon({ className = "w-4 h-4", ...props }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className={className} {...props}>
+      <path d="M14.5 3.5a1 1 0 0 1 1 1v1.1a7.5 7.5 0 0 1 3.9 2.2l.9-.4a1.5 1.5 0 1 1 1 2.8c-.3 0-.6-.1-.8-.3l-1 .5c.3.7.5 1.5.5 2.3 0 3.7-3.8 6.8-8.5 6.8S3.5 17.3 3.5 13.6c0-.8.2-1.6.5-2.3l-1-.5a1.5 1.5 0 1 1 0-2.5l1 .4A7.5 7.5 0 0 1 8 5.6V4.5a1 1 0 1 1 2 0v.8c.5-.1 1-.1 1.5-.1.5 0 1 0 1.5.1V4.5a1 1 0 0 1 1-1ZM9 12a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm6 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm-3 5.2c1.4 0 2.6-.5 3.3-1.2a.75.75 0 0 0-1-1.1c-.5.5-1.3.8-2.3.8s-1.8-.3-2.3-.8a.75.75 0 1 0-1 1.1c.7.7 1.9 1.2 3.3 1.2Z"/>
+    </svg>
+  )
+}
+
+// ---------- severity styles ----------
 const sev = {
-  high:  { badge: "bg-red-100 text-red-700",    bar: "bg-red-500"    },
-  medium:{ badge: "bg-orange-100 text-orange-700", bar: "bg-orange-500" },
-  low:   { badge: "bg-green-100 text-green-700",  bar: "bg-green-500"  },
+  high:   { badge: "bg-red-100 text-red-700",     bar: "bg-red-500"    },
+  medium: { badge: "bg-orange-100 text-orange-700", bar: "bg-orange-500" },
+  low:    { badge: "bg-green-100 text-green-700",   bar: "bg-green-500"  },
 }
 const sevKey = (s) => (s || "low").toLowerCase()
 
-// small sparkline
+// ---------- tiny sparkline ----------
 function Sparkline({ data }) {
   return (
     <div className="h-8 w-full">
@@ -31,7 +47,7 @@ function Sparkline({ data }) {
   )
 }
 
-// severity pill
+// ---------- badges ----------
 function SeverityBadge({ level }) {
   const k = sevKey(level)
   return (
@@ -41,10 +57,10 @@ function SeverityBadge({ level }) {
   )
 }
 
-// live alert item
+// ---------- live alert ----------
 function LiveAlert({ item }) {
   const k = sevKey(item.severity)
-  const Icon = item.platform === "reddit" ? Reddit : Twitter // fallback "X" to Twitter icon
+  const Icon = item.platform === "reddit" ? RedditIcon : XIcon
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -56,17 +72,17 @@ function LiveAlert({ item }) {
           <div className="text-sm font-semibold text-gray-900">{item.title}</div>
           <SeverityBadge level={item.severity} />
         </div>
-        <Icon className="size-4 text-gray-500" />
+        <Icon className="h-4 w-4 text-gray-500" />
       </div>
       <p className="mt-2 text-sm text-gray-700 line-clamp-3">{item.description}</p>
       <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
-        <Clock className="size-3" /> {item.timeAgo || "just now"}
+        <Clock className="h-3 w-3" /> {item.timeAgo || "just now"}
       </div>
     </motion.div>
   )
 }
 
-// campaign card
+// ---------- campaign card ----------
 function CampaignCard({ c, onView }) {
   const k = sevKey(c.severity)
   const pct = Math.max(0, Math.min(100, c.activity || 0))
@@ -96,7 +112,7 @@ function CampaignCard({ c, onView }) {
 
       {/* Activity bar */}
       <div className="mt-3">
-        <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+        <div className="mb-1 flex items-center justify-between text-xs text-gray-500">
           <span>Activity Level</span>
           <span>{pct}%</span>
         </div>
@@ -108,7 +124,7 @@ function CampaignCard({ c, onView }) {
       {/* Lead / reposts / sparkline */}
       <div className="mt-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <div className="size-6 rounded-full bg-gray-200" />
+          <div className="h-8 w-8 rounded-full bg-purple-200" />
           <div className="text-xs text-gray-600">
             <span className="font-medium">Lead:</span> {c.lead?.name || "—"}
           </div>
@@ -116,7 +132,9 @@ function CampaignCard({ c, onView }) {
         <div className="text-xs text-gray-500">{c.reposts || 0} reposts</div>
       </div>
 
-      <div className="mt-2"><Sparkline data={c.spark || sampleSpark()} /></div>
+      <div className="mt-2">
+        <Sparkline data={c.spark || sampleSpark()} />
+      </div>
 
       <button
         onClick={() => onView?.(c)}
@@ -128,22 +146,22 @@ function CampaignCard({ c, onView }) {
   )
 }
 
-// simple spark data
+// ---------- sample spark data ----------
 const sampleSpark = () =>
-  Array.from({ length: 12 }, (_, i) => ({ v: 20 + Math.round(Math.random() * 60) }))
+  Array.from({ length: 12 }, () => ({ v: 20 + Math.round(Math.random() * 60) }))
 
-// --- PAGE -------------------------------------------------------------------
+// ---------- page ----------
 export default function DashboardPage() {
   const navigate = useNavigate()
 
   // Header search & prompt-to-assistant
   const [globalSearch, setGlobalSearch] = useState("")
   const [prompt, setPrompt] = useState("")
-  const askAI = () => {
+  const askAI = useCallback(() => {
     const q = prompt.trim()
     if (q) navigate(`/assistant?q=${encodeURIComponent(q)}`)
     else navigate("/assistant")
-  }
+  }, [prompt, navigate])
 
   // Alerts (right column, real-time)
   const [alerts, setAlerts] = useState(() => demoAlerts())
@@ -153,53 +171,54 @@ export default function DashboardPage() {
 
   // Socket wiring
   useEffect(() => {
-    const socket = io(SOCKET_URL, { transports: ["websocket"] })
-
-    // Live alerts from backend
-    socket.on("live_alert", (payload) => {
-      setAlerts((curr) => [formatAlert(payload), ...curr].slice(0, 30))
+    const socket = io(SOCKET_URL, {
+      transports: ["websocket"],
+      reconnection: true,
+      reconnectionAttempts: 5,
     })
 
-    // Campaign updates
-    socket.on("campaign_update", (payload) => {
+    const onConnectError = (err) => console.error("Socket connection error:", err)
+    const onLiveAlert = (payload) => setAlerts((curr) => [formatAlert(payload), ...curr].slice(0, 30))
+    const onCampaignUpdate = (payload) => {
       setCampaigns((curr) => {
         const idx = curr.findIndex((x) => x.id === payload.id)
         const incoming = normalizeCampaign(payload)
         if (idx >= 0) {
-          // merge
           const clone = curr.slice()
           clone[idx] = { ...clone[idx], ...incoming }
           return clone
         }
         return [incoming, ...curr]
       })
-    })
+    }
 
-    return () => socket.disconnect()
+    socket.on("connect_error", onConnectError)
+    socket.on("live_alert", onLiveAlert)
+    socket.on("campaign_update", onCampaignUpdate)
+
+    return () => {
+      socket.off("connect_error", onConnectError)
+      socket.off("live_alert", onLiveAlert)
+      socket.off("campaign_update", onCampaignUpdate)
+      socket.disconnect()
+    }
   }, [])
 
   // Suggested topics
   const suggestions = useMemo(
-    () => [
-      "Campaign Analysis",
-      "Threat Intelligence",
-      "Narrative Tracking",
-      "Evidence Collection",
-    ],
+    () => ["Campaign Analysis", "Threat Intelligence", "Narrative Tracking", "Evidence Collection"],
     []
   )
 
-  const viewCampaign = (c) => navigate(`/campaigns/${c.id}`)
+  const viewCampaign = useCallback((c) => navigate(`/campaigns/${c.id}`), [navigate])
 
   return (
     <div className="h-screen w-full overflow-hidden bg-gray-50">
       {/* TOP BAR / HERO */}
       <header className="flex items-center justify-between gap-4 border-b bg-white px-5 py-3">
         {/* Left: brand + search */}
-        <div className="flex items-center gap-4 w-[48%]">
-          <div className="text-lg font-bold text-purple-700 whitespace-nowrap">
-            Project Sentinel
-          </div>
+        <div className="flex w-[48%] items-center gap-4">
+          <div className="whitespace-nowrap text-lg font-bold text-purple-700">Project Sentinel</div>
           <input
             value={globalSearch}
             onChange={(e) => setGlobalSearch(e.target.value)}
@@ -221,8 +240,8 @@ export default function DashboardPage() {
             className="flex items-center gap-2 rounded-xl border px-3 py-2 hover:bg-gray-50"
             title="Account"
           >
-            <div className="size-8 rounded-full bg-purple-200" />
-            <div className="text-left leading-tight">
+            <div className="h-8 w-8 rounded-full bg-purple-200" />
+            <div className="leading-tight text-left">
               <div className="text-sm font-semibold">Emma Chen</div>
               <div className="text-xs text-gray-500">Senior Analyst</div>
             </div>
@@ -312,7 +331,7 @@ export default function DashboardPage() {
   )
 }
 
-// --- demo / normalization helpers ------------------------------------------
+// ---------- helpers ----------
 function timeAgo(ts) {
   if (!ts) return "just now"
   const diff = Math.max(0, Date.now() - new Date(ts).getTime())
@@ -377,60 +396,12 @@ function demoAlerts() {
 
 function demoCampaigns() {
   const rows = [
-    {
-      id: "c1",
-      title: "Operation Shadow Whisper",
-      severity: "high",
-      description: "Coordinated disinformation targeting election integrity.",
-      activity: 78,
-      lead: { name: "Alex Morgan" },
-      reposts: 12,
-    },
-    {
-      id: "c2",
-      title: "Cerberus Network",
-      severity: "medium",
-      description: "Multi-platform influence operation around health narratives.",
-      activity: 52,
-      lead: { name: "Sarah Kim" },
-      reposts: 8,
-    },
-    {
-      id: "c3",
-      title: "Phoenix Rising",
-      severity: "medium",
-      description: "Network spreading misinformation in financial markets.",
-      activity: 45,
-      lead: { name: "Marcus Johnson" },
-      reposts: 5,
-    },
-    {
-      id: "c4",
-      title: "Midnight Vanguard",
-      severity: "high",
-      description: "State-sponsored campaign targeting critical infrastructure.",
-      activity: 83,
-      lead: { name: "Emma Chen" },
-      reposts: 15,
-    },
-    {
-      id: "c5",
-      title: "Echo Chamber",
-      severity: "low",
-      description: "Hashtag campaign spreading polarization through coordination.",
-      activity: 28,
-      lead: { name: "David Park" },
-      reposts: 3,
-    },
-    {
-      id: "c6",
-      title: "Truth Distortion",
-      severity: "medium",
-      description: "Network of fake news sites in multiple languages.",
-      activity: 61,
-      lead: { name: "Priya Singh" },
-      reposts: 9,
-    },
+    { id: "c1", title: "Operation Shadow Whisper", severity: "high",   description: "Coordinated disinformation targeting election integrity.",  activity: 78, lead: { name: "Alex Morgan" },   reposts: 12 },
+    { id: "c2", title: "Cerberus Network",         severity: "medium", description: "Multi-platform influence operation around health narratives.", activity: 52, lead: { name: "Sarah Kim" },     reposts: 8  },
+    { id: "c3", title: "Phoenix Rising",           severity: "medium", description: "Network spreading misinformation in financial markets.",       activity: 45, lead: { name: "Marcus Johnson" }, reposts: 5  },
+    { id: "c4", title: "Midnight Vanguard",        severity: "high",   description: "State-sponsored campaign targeting critical infrastructure.", activity: 83, lead: { name: "Emma Chen" },     reposts: 15 },
+    { id: "c5", title: "Echo Chamber",             severity: "low",    description: "Hashtag campaign spreading polarization through coordination.", activity: 28, lead: { name: "David Park" },     reposts: 3  },
+    { id: "c6", title: "Truth Distortion",         severity: "medium", description: "Network of fake news sites in multiple languages.",           activity: 61, lead: { name: "Priya Singh" },    reposts: 9  },
   ]
   return rows.map(normalizeCampaign)
 }
