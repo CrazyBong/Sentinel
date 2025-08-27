@@ -1,5 +1,6 @@
 // src/pages/AnalyticsTrendsPage.jsx
 // eslint-disable-next-line no-unused-vars
+import AIDetectionSummary from "../components/AIDetectionSummary";
 import { useEffect, useMemo, useState, useCallback } from "react"
 // eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion"
@@ -335,34 +336,7 @@ export default function AnalyticsTrendsPage() {
             </Card>
 
             {/* AI Detection Summary */}
-            <Card className="p-4 bg-purple-600 text-white">
-              <SectionTitle>AI Detection Summary</SectionTitle>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <div className="opacity-80">Total Content Analyzed</div>
-                  <div className="text-xl font-bold">{aiDetection.totalAnalyzed.toLocaleString()}</div>
-                </div>
-                <div>
-                  <div className="opacity-80">AI-Generated Content</div>
-                  <div className="text-xl font-bold">{aiDetection.aiGenerated.toLocaleString()}</div>
-                </div>
-                <div className="col-span-2">
-                  <div className="opacity-80">Detection Accuracy</div>
-                  <div className="text-xl font-bold">{aiDetection.accuracyPct}%</div>
-                </div>
-              </div>
-
-              <div className="mt-3 space-y-2">
-                {aiDetection.breakdown.map((b, i) => (
-                  <div key={i}>
-                    <div className="mb-1 text-xs">{b.label}</div>
-                    <div className="h-2 w-full rounded-full bg-white/20">
-                      <div className="h-2 rounded-full bg-white" style={{ width: `${b.pct}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
+            <AIDetectionSummary data={aiDetection} />
           </div>
         </section>
       </div>
