@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom"
 import { Clock } from "lucide-react"               // keep lucide only for neutral icons
 import { LineChart, Line, ResponsiveContainer } from "recharts"
 import { io } from "socket.io-client"
+import Sidebar from "../components/ui/Sidebar"
 
 // --- CONFIG: set your Socket.IO endpoint here ---
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3001"
@@ -249,84 +250,89 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {/* BODY GRID: left content + right live alerts */}
-      <main className="grid h-[calc(100vh-64px)] min-h-0 grid-cols-[1fr_320px] gap-4 p-4">
-        {/* LEFT COLUMN */}
-        <section className="min-h-0 overflow-auto rounded-2xl">
-          {/* Ask prompt box */}
-          <div className="rounded-2xl border bg-white p-4 shadow-sm">
-            <div className="text-lg font-semibold text-gray-900">Ask Project Sentinel</div>
-            <div className="mt-2 flex items-center gap-2">
-              <input
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="e.g., Analyze recent disinformation trends in Eastern Europe…"
-                className="flex-1 rounded-xl border border-gray-300 px-3 py-2 outline-none focus:ring-4 focus:ring-purple-200"
-              />
-              <button
-                onClick={askAI}
-                className="shrink-0 rounded-xl bg-purple-500 px-4 py-2 font-semibold text-white hover:bg-purple-600 active:scale-[0.98]"
-              >
-                Ask
-              </button>
-            </div>
+    {/* BODY GRID */}
+<main className="grid h-[calc(100vh-64px)] min-h-0 grid-cols-[240px_1fr_320px] gap-4 p-4">
+  
+  {/* SIDEBAR */}
+  <Sidebar />
 
-            {/* Suggested topics */}
-            <div className="mt-3 flex flex-wrap gap-2">
-              {suggestions.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => navigate(`/assistant?q=${encodeURIComponent(s)}`)}
-                  className="rounded-full border px-3 py-1 text-xs text-gray-700 hover:bg-gray-50"
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
+  {/* MAIN CONTENT */}
+  <section className="min-h-0 overflow-auto rounded-2xl">
+    {/* Ask Project Sentinel + Active Campaigns */}
+    <div className="rounded-2xl border bg-white p-4 shadow-sm">
+      <div className="text-lg font-semibold text-gray-900">SentinelAI</div>
+      <div className="mt-2 flex items-center gap-2">
+        <input
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          placeholder="e.g., Analyze recent disinformation trends in Eastern Europe…"
+          className="flex-1 rounded-xl border border-gray-300 px-3 py-2 outline-none focus:ring-4 focus:ring-purple-200"
+        />
+        <button
+          onClick={askAI}
+          className="shrink-0 rounded-xl bg-purple-500 px-4 py-2 font-semibold text-white hover:bg-purple-600 active:scale-[0.98]"
+        >
+          Ask
+        </button>
+      </div>
 
-          {/* Active Campaigns header */}
-          <div className="mt-4 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">Active Campaigns</h2>
-            <button
-              onClick={() => navigate("/campaigns/new")}
-              className="rounded-xl border border-purple-300 bg-white px-3 py-2 text-sm font-semibold text-purple-700 hover:bg-purple-50"
-            >
-              New Campaign
-            </button>
-          </div>
-
-          {/* Campaign cards (3-up) */}
-          <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <AnimatePresence initial={false}>
-              {campaigns.map((c) => (
-                <CampaignCard key={c.id} c={c} onView={viewCampaign} />
-              ))}
-            </AnimatePresence>
-          </div>
-        </section>
-
-        {/* RIGHT COLUMN — LIVE ALERTS */}
-        <aside className="flex min-h-0 flex-col rounded-2xl border bg-white p-3">
-          <div className="px-1 text-sm font-semibold text-gray-900">Live Alerts</div>
-
-          {/* Scrollable list */}
-          <div className="mt-2 flex-1 min-h-0 space-y-2 overflow-auto pr-1">
-            <AnimatePresence initial={false}>
-              {alerts.map((a) => (
-                <LiveAlert key={a.id} item={a} />
-              ))}
-            </AnimatePresence>
-          </div>
-
+      {/* Suggested topics */}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {suggestions.map((s) => (
           <button
-            onClick={() => navigate("/alerts")}
-            className="mt-3 rounded-xl bg-purple-500 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-600 active:scale-[0.98]"
+            key={s}
+            onClick={() => navigate(`/assistant?q=${encodeURIComponent(s)}`)}
+            className="rounded-full border px-3 py-1 text-xs text-gray-700 hover:bg-gray-50"
           >
-            View All Alerts
+            {s}
           </button>
-        </aside>
-      </main>
+        ))}
+      </div>
+    </div>
+
+    {/* Active Campaigns */}
+    <div className="mt-4 flex items-center justify-between">
+      <h2 className="text-xl font-semibold text-gray-900">Active Campaigns</h2>
+      <button
+        onClick={() => navigate("/campaigns/new")}
+        className="rounded-xl border border-purple-300 bg-white px-3 py-2 text-sm font-semibold text-purple-700 hover:bg-purple-50"
+      >
+        New Campaign
+      </button>
+    </div>
+
+    {/* Campaign cards */}
+    <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <AnimatePresence initial={false}>
+        {campaigns.map((c) => (
+          <CampaignCard key={c.id} c={c} onView={viewCampaign} />
+        ))}
+      </AnimatePresence>
+    </div>
+  </section>
+
+  {/* RIGHT COLUMN — LIVE ALERTS */}
+  <aside className="flex min-h-0 flex-col rounded-2xl border bg-white p-3">
+    <div className="px-1 text-sm font-semibold text-gray-900">Live Alerts</div>
+
+    <div className="mt-2 flex-1 min-h-0 space-y-2 overflow-auto pr-1">
+      <AnimatePresence initial={false}>
+        {alerts.map((a) => (
+          <LiveAlert key={a.id} item={a} />
+        ))}
+      </AnimatePresence>
+    </div>
+
+    <button
+      onClick={() => navigate("/alerts")}
+      className="mt-3 rounded-xl bg-purple-500 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-600 active:scale-[0.98]"
+    >
+      View All Alerts
+    </button>
+  </aside>
+</main>
+
+ 
     </div>
   )
 }
