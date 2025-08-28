@@ -11,6 +11,7 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, Legend
 } from "recharts"
 import { io } from "socket.io-client"
+import Sidebar from "@/components/ui/Sidebar";
 
 // --- Config (wire to env when backend is ready)
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3001"
@@ -173,20 +174,9 @@ export default function AnalyticsTrendsPage() {
       </header>
 
       {/* Body: left nav + content */}
-      <div className="row-start-2 grid grid-cols-[220px_1fr] gap-4 p-4">
+      <div className="row-start-2 flex h-[calc(100vh-96px)]">
         {/* Left Nav (no Evidence Library / Settings) */}
-        <aside className="flex h-[calc(100vh-96px)] flex-col rounded-2xl border bg-white p-3">
-          <nav className="space-y-1 text-sm">
-            <NavLink text="Dashboard" onClick={() => navigate("/dashboard")} />
-            <NavLink text="Campaigns Archive" onClick={() => navigate("/archive")} />
-            <NavLink text="Analytics & Trends" onClick={() => navigate("/analytics")} />
-            <NavLink text="AI Assistant" onClick={() => navigate("/assistant")} />
-            <NavLink text="Logout" danger onClick={() => navigate("/login")} />
-          </nav>
-          <div className="mt-auto pt-3">
-            <button className="w-full rounded-xl border px-3 py-2 text-sm hover:bg-gray-50">Get Help</button>
-          </div>
-        </aside>
+        <Sidebar />
 
         {/* Main content (scroll) */}
         <section className="min-h-0 overflow-auto">
@@ -389,17 +379,6 @@ export default function AnalyticsTrendsPage() {
 }
 
 /* ---------- tiny UI bits ---------- */
-function NavLink({ text, onClick, danger }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`w-full rounded-xl px-3 py-2 text-left text-sm transition ${danger ? "text-red-600 hover:bg-red-50" : "text-gray-700 hover:bg-gray-50"}`}
-    >
-      {text}
-    </button>
-  )
-}
-
 function ToggleButton({ label, active, onClick }) {
   return (
     <button

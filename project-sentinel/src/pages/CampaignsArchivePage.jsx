@@ -3,6 +3,8 @@ import { useMemo, useState, useCallback, useEffect } from "react"
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "framer-motion"
 import { useNavigate } from "react-router-dom"
+import Sidebar from "@/components/ui/Sidebar"
+
 
 // ---- Inline platform icons (avoid lucide brand exports)
 const XIcon = (p) => (
@@ -56,14 +58,14 @@ const SeverityBadge = ({ level }) => {
   )
 }
 
-const SidebarLink = ({ text, onClick, danger }) => (
-  <button
-    onClick={onClick}
-    className={`w-full rounded-xl px-3 py-2 text-left text-sm transition ${danger ? "text-red-600 hover:bg-red-50" : "text-gray-700 hover:bg-gray-50"}`}
-  >
-    {text}
-  </button>
-)
+// const SidebarLink = ({ text, onClick, danger }) => (
+//   <button
+//     onClick={onClick}
+//     className={`w-full rounded-xl px-3 py-2 text-left text-sm transition ${danger ? "text-red-600 hover:bg-red-50" : "text-gray-700 hover:bg-gray-50"}`}
+//   >
+//     {text}
+//   </button>
+// )
 
 export default function CampaignsArchivePage() {
   const navigate = useNavigate()
@@ -169,21 +171,9 @@ export default function CampaignsArchivePage() {
       </header>
 
       {/* Body: sidebar + content */}
-      <div className="row-start-2 grid grid-cols-[220px_1fr] gap-4 p-4">
+      <div className="row-start-2 grid grid-cols-[auto_1fr] gap-4 p-4">
         {/* Left sidebar nav */}
-        <aside className="flex h-[calc(100vh-96px)] flex-col rounded-2xl border bg-white p-3">
-          <nav className="space-y-1 text-sm">
-            <SidebarLink text="Dashboard" onClick={() => navigate("/dashboard")} />
-            <SidebarLink text="Campaigns Archive" onClick={() => navigate("/archive")} />
-            <SidebarLink text="Analytics & Trends" onClick={() => navigate("/analytics")} />
-            <SidebarLink text="AI Assistant" onClick={() => navigate("/assistant")} />
-            <SidebarLink text="Logout" danger onClick={() => navigate("/login")} />
-          </nav>
-          <div className="mt-auto pt-3">
-            <button className="w-full rounded-xl border px-3 py-2 text-sm hover:bg-gray-50">Get Help</button>
-          </div>
-        </aside>
-
+        <Sidebar/>
         {/* Main content grid */}
         <div className="grid h-[calc(100vh-96px)] grid-cols-[300px_1fr] gap-4">
           {/* Filters panel */}

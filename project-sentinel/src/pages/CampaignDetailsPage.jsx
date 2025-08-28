@@ -7,6 +7,8 @@ import {
   ResponsiveContainer, ScatterChart, Scatter, ZAxis
 } from "recharts"
 import { io } from "socket.io-client"
+import Sidebar from "@/components/ui/Sidebar"
+
 
 // ---------- CONFIG ----------
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3001"
@@ -315,20 +317,10 @@ export default function CampaignDetailsPage() {
       </header>
 
       {/* Body: sidebar + content */}
-      <div className="row-start-2 grid grid-cols-[220px_1fr] gap-4 p-4">
+      <div className="row-start-2 grid grid-cols-[auto_1fr] gap-4 p-4">
         {/* Left sidebar */}
-        <aside className="flex h-[calc(100vh-96px)] flex-col rounded-2xl border bg-white p-3">
-          <nav className="space-y-1 text-sm">
-            <SidebarLink onClick={() => navigate("/dashboard")} text="Dashboard" />
-            <SidebarLink onClick={() => navigate("/archive")} text="Campaigns Archive" />
-            <SidebarLink onClick={() => navigate("/analytics")} text="Analytics & Trends" />
-            <SidebarLink onClick={() => navigate("/assistant")} text="AI Assistant" />
-            <SidebarLink onClick={() => navigate("/login")} text="Logout" danger />
-          </nav>
-          <div className="mt-auto pt-3">
-            <button className="w-full rounded-xl border px-3 py-2 text-sm hover:bg-gray-50">Get Help</button>
-          </div>
-        </aside>
+        <Sidebar />
+
 
         {/* Main content grid */}
         <div className="grid h-[calc(100vh-96px)] grid-cols-[1fr_360px] gap-4">

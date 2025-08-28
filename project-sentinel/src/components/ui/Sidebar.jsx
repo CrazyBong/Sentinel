@@ -19,7 +19,7 @@ export default function Sidebar() {
 
   const navItems = [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { to: "/campaigns/archive", label: "Campaign Archive", icon: Archive },
+    { to: "/archive", label: "Campaign Archive", icon: Archive },
     { to: "/analytics", label: "Analytics & Trends", icon: BarChart3 },
     { to: "/assistant", label: "AI Assistant", icon: Bot },
     { to: "/settings", label: "Settings", icon: Settings },
@@ -57,19 +57,22 @@ export default function Sidebar() {
       <nav className="flex-1 px-2 py-4 space-y-1">
         {navItems.map(({ to, label, icon: Icon }) => (
           <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                isActive
-                  ? "bg-purple-100 text-purple-700"
-                  : "text-gray-700 hover:bg-purple-50 hover:text-purple-700"
-              }`
-            }
-          >
-            <Icon className="h-5 w-5 shrink-0" />
-            {open && <span>{label}</span>}
-          </NavLink>
+  key={to}
+  to={to}
+  className={({ isActive }) =>
+    `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+      label === "Logout"
+        ? "text-gray-700 hover:bg-red-50 hover:text-red-700" // 🔴 logout hover red
+        : isActive
+        ? "bg-purple-100 text-purple-700"
+        : "text-gray-700 hover:bg-purple-50 hover:text-purple-700"
+    }`
+  }
+>
+  <Icon className="h-5 w-5 shrink-0" />
+  {open && <span>{label}</span>}
+</NavLink>
+
         ))}
       </nav>
 
