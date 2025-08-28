@@ -161,7 +161,6 @@ export default function AIAssistantPage() {
           <SidebarLink to="/archive">Campaigns Archive</SidebarLink>
           <SidebarLink to="/analytics">Analytics & Trends</SidebarLink>
           <SidebarLink to="/assistant" active>AI Assistant</SidebarLink>
-          <SidebarLink to="/settings">Settings</SidebarLink>
           <SidebarLink to="/logout">Logout</SidebarLink>
           <div className="mt-auto">
             <button
