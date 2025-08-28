@@ -21,6 +21,8 @@ import analyticsRoutes from './routes/analytics.routes.js';
 import evidenceRoutes from './routes/evidence.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
 import alertRoutes from './routes/alert.routes.js';
+import searchRoutes from './routes/search.routes.js';
+
 
 const app = express();
 const server = http.createServer(app); // Create HTTP server for Socket.IO
@@ -76,6 +78,8 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/evidence', evidenceRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/alerts', alertRoutes);
+app.use('/api/search', searchRoutes); 
+
 
 // Health check with Socket.IO status
 app.get('/health', (req, res) => {
