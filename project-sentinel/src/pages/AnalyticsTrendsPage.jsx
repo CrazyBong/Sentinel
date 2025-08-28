@@ -253,26 +253,58 @@ export default function AnalyticsTrendsPage() {
             </Card>
 
             {/* Platform Distribution */}
-            <Card className="p-4">
-              <div className="mb-2 flex items-center justify-between">
-                <SectionTitle>Platform Distribution</SectionTitle>
-                {/* filter button placeholder */}
-                <button className="rounded-lg border px-2 py-1 text-xs hover:bg-gray-50">Filter</button>
-              </div>
-              <div className="h-56">
-                <ResponsiveContainer>
-                  <PieChart>
-                    <Pie data={platformDist} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80}>
-                      {platformDist.map((entry, i) => (
-                        <Cell key={entry.name} fill={platformColors[i % platformColors.length]} />
-                      ))}
-                    </Pie>
-                    <Legend />
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
+<Card className="p-4">
+  {/* Header with Filter icon */}
+  <div className="mb-2 flex items-center justify-between">
+    <SectionTitle>Platform Distribution</SectionTitle>
+    <button className="flex items-center gap-1 text-gray-600 text-sm hover:text-gray-800">
+      <span className="material-icons text-base">filter_alt</span> {/* or use Heroicons */}
+      Filter
+    </button>
+  </div>
+
+  <div className="flex items-center">
+    {/* Pie Chart */}
+    <div className="h-56 w-1/2">
+      <ResponsiveContainer>
+        <PieChart>
+          <Pie
+            data={platformDist}
+            dataKey="value"
+            nameKey="name"
+            outerRadius={90}
+            innerRadius={0}   // ✅ solid pie, not donut
+            labelLine={false}
+          >
+            {platformDist.map((entry, i) => (
+              <Cell
+                key={entry.name}
+                fill={platformColors[i % platformColors.length]}
+              />
+            ))}
+          </Pie>
+          <Tooltip />
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
+
+    {/* Custom Legend */}
+    <div className="w-1/2 pl-6 space-y-2">
+      {platformDist.map((entry, i) => (
+        <div key={entry.name} className="flex items-center space-x-2">
+          <span
+            className="inline-block h-3 w-3 rounded-full"
+            style={{ backgroundColor: platformColors[i % platformColors.length] }}
+          ></span>
+          <span className="text-sm text-gray-700">
+            {entry.name} - {entry.value}%
+          </span>
+        </div>
+      ))}
+    </div>
+  </div>
+</Card>
+
           </div>
 
           {/* Heatmap/Severity + Narrative Trends */}
