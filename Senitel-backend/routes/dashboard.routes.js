@@ -1,56 +1,42 @@
 import express from 'express';
+import {
+  getDashboardOverview,
+  getRealtimeData,
+  getSystemMetrics,
+  getPerformanceAnalytics,
+  getActivityFeed,
+  getQuickStats,
+  exportAnalyticsData,
+  getCampaignAnalytics,
+  getAlertAnalytics,
+  getThreatIntelligence
+} from '../controllers/dashboard.controllers.js';
 import { authMiddleware } from '../middlewares/auth.js';
 
 const router = express.Router();
 
 // Dashboard overview
-router.get('/overview', authMiddleware, async (req, res) => {
-  try {
-    // Quick dashboard data - we'll expand this later
-    const dashboardData = {
-      stats: {
-        totalCampaigns: 0,
-        activeCampaigns: 0,
-        totalTweets: 0,
-        alertsToday: 0
-      },
-      recentActivity: [],
-      topThreats: [],
-      systemStatus: 'operational'
-    };
-
-    res.json({
-      success: true,
-      data: dashboardData
-    });
-  } catch (error) {
-    console.error('Dashboard overview error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get dashboard overview'
-    });
-  }
-});
+router.get('/overview', authMiddleware, getDashboardOverview);
 
 // Quick stats
-router.get('/stats', authMiddleware, async (req, res) => {
-  try {
-    res.json({
-      success: true,
-      data: {
-        campaigns: { total: 0, active: 0 },
-        tweets: { total: 0, today: 0 },
-        alerts: { total: 0, today: 0 },
-        evidence: { total: 0, size: 0 }
-      }
-    });
-  } catch (error) {
-    console.error('Dashboard stats error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get dashboard stats'
-    });
-  }
-});
+router.get('/stats', authMiddleware, getQuickStats);
+
+// Real-time data streams
+router.get('/realtime', authMiddleware, getRealtimeData);
+
+// System metrics and monitoring
+router.get('/system/metrics', authMiddleware, getSystemMetrics);
+router.get('/system/performance', authMiddleware, getPerformanceAnalytics);
+
+// Activity feed
+router.get('/activity', authMiddleware, getActivityFeed);
+
+// Analytics exports
+router.post('/export', authMiddleware, exportAnalyticsData);
+
+// Specific analytics
+router.get('/campaigns/:campaignId/analytics', authMiddleware, getCampaignAnalytics);
+router.get('/alerts/analytics', authMiddleware, getAlertAnalytics);
+router.get('/threats/intelligence', authMiddleware, getThreatIntelligence);
 
 export default router;
