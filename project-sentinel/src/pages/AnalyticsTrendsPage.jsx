@@ -11,7 +11,8 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, Legend
 } from "recharts"
 import { io } from "socket.io-client"
-import Sidebar from "@/components/ui/Sidebar";
+import Sidebar from "@/components/ui/Sidebar"
+import AccountButton from "@/components/AccountButton";
 
 // --- Config (wire to env when backend is ready)
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3001"
@@ -182,21 +183,7 @@ export default function AnalyticsTrendsPage() {
           >
             Ask AI
           </button>
-          <button
-            onClick={() => navigate("/settings")}
-            className="flex items-center gap-2 px-3 py-2 bg-transparent hover:bg-gray-50 rounded-lg transition-colors"
-            title="Account Settings"
-          >
-            <div className="h-7 w-7 rounded-full bg-purple-200 flex items-center justify-center">
-              <svg className="h-4 w-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </div>
-            <div className="leading-tight text-left">
-              <div className="text-sm font-semibold">Emma Chen</div>
-              <div className="text-xs text-gray-500">Senior Analyst</div>
-            </div>
-          </button>
+          <AccountButton />
           <button
             onClick={() => navigate("/login")}
             className="rounded-xl border px-3 py-2 hover:bg-gray-50"

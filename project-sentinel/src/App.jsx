@@ -1,5 +1,6 @@
 // src/App.jsx
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
+import { UserProvider } from "@/context/UserContext"
 
 // Pages
 import LoginPage from "@/pages/LoginPage"
@@ -20,28 +21,30 @@ function ErrorOverlay({ children }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <ErrorOverlay>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignupPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+    <UserProvider>
+      <BrowserRouter>
+        <ErrorOverlay>
+          <Routes>
+            {/* Public routes */}
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/signup" element={<SignupPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
-          {/* App routes */}
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/assistant" element={<AIAssistantPage />} />
-          <Route path="/archive" element={<CampaignsArchivePage />} />
-          <Route path="/analytics" element={<AnalyticsTrendsPage />} />
-          <Route path="/campaigns/:id" element={<CampaignDetailsPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/help" element={<HelpPage />} />
+            {/* App routes */}
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/assistant" element={<AIAssistantPage />} />
+            <Route path="/archive" element={<CampaignsArchivePage />} />
+            <Route path="/analytics" element={<AnalyticsTrendsPage />} />
+            <Route path="/campaigns/:id" element={<CampaignDetailsPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/help" element={<HelpPage />} />
 
-          {/* Redirects */}
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
-      </ErrorOverlay>
-    </BrowserRouter>
+            {/* Redirects */}
+            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </Routes>
+        </ErrorOverlay>
+      </BrowserRouter>
+    </UserProvider>
   )
 }

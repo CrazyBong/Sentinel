@@ -1,28 +1,47 @@
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { motion } from "framer-motion"
 import Sidebar from "@/components/ui/Sidebar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useUser } from "@/context/UserContext"
 
 export default function SettingsPage() {
-  const [name, setName] = useState("Emma Chen")
-  const [email, setEmail] = useState("emma.chen@example.com")
-  const [phone, setPhone] = useState("+1 555 123 4567")
-  const [jobTitle, setJobTitle] = useState("Senior Analyst")
-  const [department, setDepartment] = useState("Intelligence")
-  const [bio, setBio] = useState("Experienced analyst specializing in disinformation detection and campaign monitoring.")
-  const [photo, setPhoto] = useState(null)
+  const { user, updateUser, updateUserPhoto } = useUser()
+  const [name, setName] = useState(user.name)
+  const [email, setEmail] = useState(user.email)
+  const [phone, setPhone] = useState(user.phone)
+  const [jobTitle, setJobTitle] = useState(user.jobTitle)
+  const [department, setDepartment] = useState(user.department)
+  const [bio, setBio] = useState(user.bio)
+  const [photo, setPhoto] = useState(user.photo)
   const [photoFile, setPhotoFile] = useState(null)
-  const [notifications, setNotifications] = useState(true)
-  const [emailAlerts, setEmailAlerts] = useState(true)
-  const [pushNotifications, setPushNotifications] = useState(false)
-  const [theme, setTheme] = useState("light")
-  const [language, setLanguage] = useState("en")
-  const [timezone, setTimezone] = useState("UTC-5")
+  const [notifications, setNotifications] = useState(user.notifications)
+  const [emailAlerts, setEmailAlerts] = useState(user.emailAlerts)
+  const [pushNotifications, setPushNotifications] = useState(user.pushNotifications)
+  const [theme, setTheme] = useState(user.theme)
+  const [language, setLanguage] = useState(user.language)
+  const [timezone, setTimezone] = useState(user.timezone)
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState("")
   const fileInputRef = useRef(null)
+
+  // Update local state when user context changes
+  useEffect(() => {
+    setName(user.name)
+    setEmail(user.email)
+    setPhone(user.phone)
+    setJobTitle(user.jobTitle)
+    setDepartment(user.department)
+    setBio(user.bio)
+    setPhoto(user.photo)
+    setNotifications(user.notifications)
+    setEmailAlerts(user.emailAlerts)
+    setPushNotifications(user.pushNotifications)
+    setTheme(user.theme)
+    setLanguage(user.language)
+    setTimezone(user.timezone)
+  }, [user])
 
   const handlePhotoUpload = (e) => {
     const file = e.target.files[0]
@@ -61,6 +80,27 @@ export default function SettingsPage() {
     try {
       // TODO: Replace with your actual API call
       await new Promise((resolve) => setTimeout(resolve, 1500))
+      
+      // Update user context with new settings
+      updateUser({
+        name,
+        email,
+        phone,
+        jobTitle,
+        department,
+        bio,
+        notifications,
+        emailAlerts,
+        pushNotifications,
+        theme,
+        language,
+        timezone
+      })
+
+      // Update photo if changed
+      if (photo && photo !== user.photo) {
+        updateUserPhoto(photo)
+      }
       
       // Simulate API call for saving settings
       console.log("Saving settings:", {
@@ -409,33 +449,53 @@ export default function SettingsPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: 0.4 }}
             >
-              <Button
-                variant="outline"
-                onClick={() => {
-                  // Reset all fields to original values
-                  setName("Emma Chen")
-                  setEmail("emma.chen@example.com")
-                  setPhone("+1 555 123 4567")
-                  setJobTitle("Senior Analyst")
-                  setDepartment("Intelligence")
-                  setBio("Experienced analyst specializing in disinformation detection and campaign monitoring.")
-                  setPhoto(null)
-                  setPhotoFile(null)
-                  setNotifications(true)
-                  setEmailAlerts(true)
-                  setPushNotifications(false)
-                  setTheme("light")
-                  setLanguage("en")
-                  setTimezone("UTC-5")
-                  setError("")
-                  if (fileInputRef.current) {
-                    fileInputRef.current.value = ""
-                  }
-                }}
-                className="px-6 py-2"
-              >
-                Reset
-              </Button>
+                             <Button
+                 variant="outline"
+                 onClick={() => {
+                   // Reset all fields to original values
+                   const defaultUser = {
+                     name: "Emma Chen",
+                     email: "emma.chen@example.com",
+                     phone: "+1 555 123 4567",
+                     jobTitle: "Senior Analyst",
+                     department: "Intelligence",
+                     bio: "Experienced analyst specializing in disinformation detection and campaign monitoring.",
+                     notifications: true,
+                     emailAlerts: true,
+                     pushNotifications: false,
+                     theme: "light",
+                     language: "en",
+                     timezone: "UTC-5"
+                   }
+                   
+                   setName(defaultUser.name)
+                   setEmail(defaultUser.email)
+                   setPhone(defaultUser.phone)
+                   setJobTitle(defaultUser.jobTitle)
+                   setDepartment(defaultUser.department)
+                   setBio(defaultUser.bio)
+                   setPhoto(null)
+                   setPhotoFile(null)
+                   setNotifications(defaultUser.notifications)
+                   setEmailAlerts(defaultUser.emailAlerts)
+                   setPushNotifications(defaultUser.pushNotifications)
+                   setTheme(defaultUser.theme)
+                   setLanguage(defaultUser.language)
+                   setTimezone(defaultUser.timezone)
+                   setError("")
+                   
+                   // Update user context
+                   updateUser(defaultUser)
+                   updateUserPhoto(null)
+                   
+                   if (fileInputRef.current) {
+                     fileInputRef.current.value = ""
+                   }
+                 }}
+                 className="px-6 py-2"
+               >
+                 Reset
+               </Button>
               <Button
                 onClick={handleSave}
                 disabled={loading}

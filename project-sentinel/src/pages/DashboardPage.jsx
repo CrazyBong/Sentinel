@@ -9,6 +9,7 @@ import { Clock } from "lucide-react"               // keep lucide only for neutr
 import { LineChart, Line, ResponsiveContainer } from "recharts"
 import { io } from "socket.io-client"
 import Sidebar from "../components/ui/Sidebar"
+import AccountButton from "@/components/AccountButton"
 import ShieldLogo from "@/assets/shield.png"
 import CampArchieve from "@/assets/archive.png"
 
@@ -275,23 +276,9 @@ export default function DashboardPage() {
       </svg>
     </button>
   </div>
-  {/* Smaller account button on the right, no border */}
+  {/* Account button on the right */}
   <div className="flex items-center gap-2 ml-6">
-    <button
-      onClick={() => navigate("/settings")}
-      className="flex items-center gap-2 px-2 py-1 bg-transparent hover:bg-gray-50 rounded-lg transition-colors"
-      title="Account Settings"
-    >
-      <div className="h-7 w-7 rounded-full bg-purple-200 flex items-center justify-center">
-        <svg className="h-4 w-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-        </svg>
-      </div>
-      <div className="leading-tight text-left">
-        <div className="text-sm font-semibold">Emma Chen</div>
-        <div className="text-xs text-gray-500">Senior Analyst</div>
-      </div>
-    </button>
+    <AccountButton />
   </div>
 </header>
 
