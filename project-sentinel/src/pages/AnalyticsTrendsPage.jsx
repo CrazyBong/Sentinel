@@ -224,7 +224,7 @@ export default function AnalyticsTrendsPage() {
               <div className="mt-1 text-xs text-gray-500">{severityDelta >= 0 ? "+" : ""}{severityDelta} from last week</div>
             </Card>
 
-            <Card className="p-4 bg-purple-600 text-white">
+            <Card className=" bg-purple-600 p-4 text-black">
               <div className="flex items-center justify-between text-xs uppercase tracking-wide opacity-90">
                 <span>Most Active Platform</span>
                 <XIcon className="h-5 w-5" />
