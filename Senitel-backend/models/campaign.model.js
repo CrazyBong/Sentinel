@@ -139,6 +139,10 @@ const campaignSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Tag'
   }],
+  evidence: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Evidence'
+  }],
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
