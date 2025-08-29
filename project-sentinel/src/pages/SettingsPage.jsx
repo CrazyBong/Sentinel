@@ -368,25 +368,92 @@ export default function SettingsPage() {
             </motion.section>
 
             {/* About Section */}
-            <section className="rounded-xl border bg-white p-5 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">About</h2>
-              <div className="text-sm text-gray-700 space-y-2">
-                <p><span className="font-medium">Application:</span> Sentinel</p>
-                <p><span className="font-medium">Company:</span> Vortex Technologies</p>
-                <p><span className="font-medium">Version:</span> v1.0.0</p>
-                <p>
-                  Sentinel is an AI-powered platform designed to monitor campaigns,
-                  detect disinformation, and provide actionable insights for analysts.
-                </p>
+            <motion.section 
+              className="rounded-xl border bg-white p-6 shadow-sm"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.3 }}
+            >
+              <h2 className="text-xl font-semibold text-gray-800 mb-6">About</h2>
+              <div className="text-sm text-gray-700 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="font-medium">Application:</span>
+                  <span>Sentinel</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="font-medium">Company:</span>
+                  <span>Vortex Technologies</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="font-medium">Version:</span>
+                  <span>v1.0.0</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="font-medium">Last Updated:</span>
+                  <span>December 2024</span>
+                </div>
+                <div className="pt-3 border-t border-gray-200">
+                  <p className="text-gray-600 leading-relaxed">
+                    Sentinel is an AI-powered platform designed to monitor campaigns,
+                    detect disinformation, and provide actionable insights for analysts.
+                    Built with cutting-edge technology to protect against information warfare.
+                  </p>
+                </div>
               </div>
-            </section>
+            </motion.section>
 
             {/* Save Button */}
-            <div className="flex justify-end">
-              <button className="rounded-lg bg-purple-600 px-5 py-2 text-white font-medium hover:bg-purple-700">
-                Save Changes
-              </button>
-            </div>
+            <motion.div 
+              className="flex justify-end gap-4"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.4 }}
+            >
+              <Button
+                variant="outline"
+                onClick={() => {
+                  // Reset all fields to original values
+                  setName("Emma Chen")
+                  setEmail("emma.chen@example.com")
+                  setPhone("+1 555 123 4567")
+                  setJobTitle("Senior Analyst")
+                  setDepartment("Intelligence")
+                  setBio("Experienced analyst specializing in disinformation detection and campaign monitoring.")
+                  setPhoto(null)
+                  setPhotoFile(null)
+                  setNotifications(true)
+                  setEmailAlerts(true)
+                  setPushNotifications(false)
+                  setTheme("light")
+                  setLanguage("en")
+                  setTimezone("UTC-5")
+                  setError("")
+                  if (fileInputRef.current) {
+                    fileInputRef.current.value = ""
+                  }
+                }}
+                className="px-6 py-2"
+              >
+                Reset
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={loading}
+                className="px-8 py-2 bg-purple-600 hover:bg-purple-700 text-white"
+              >
+                {loading ? (
+                  <div className="flex items-center gap-2">
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Saving...
+                  </div>
+                ) : (
+                  "Save Changes"
+                )}
+              </Button>
+            </motion.div>
           </div>
         </main>
       </div>
