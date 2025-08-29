@@ -1,5 +1,7 @@
 // src/pages/DashboardPage.jsx
 import { useEffect, useMemo, useState, useCallback } from "react"
+import { Bell } from "lucide-react"
+import { Archive } from 'lucide-react';
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "framer-motion"
 import { useNavigate } from "react-router-dom"
@@ -7,6 +9,9 @@ import { Clock } from "lucide-react"               // keep lucide only for neutr
 import { LineChart, Line, ResponsiveContainer } from "recharts"
 import { io } from "socket.io-client"
 import Sidebar from "../components/ui/Sidebar"
+import ShieldLogo from "@/assets/shield.png"
+import CampArchieve from "@/assets/archive.png"
+
 
 // --- CONFIG: set your Socket.IO endpoint here ---
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3001"
@@ -297,7 +302,18 @@ export default function DashboardPage() {
   
   {/* SentinelAI box */}
   <div className="rounded-2xl bg-white shadow-md border border-gray-200 p-6 mb-6 flex flex-col gap-4">
-  <h2 className="text-xl font-bold text-gray-900 mb-2">Ask Project Sentinel</h2>
+  <h2 className="flex items-center gap-1 text-2xl font-bold text-gray-900">
+  {open && (
+  <img
+    src={ShieldLogo}
+    alt="Sentinel Logo"
+    className="h-8 w-8 object-contain"
+  />
+)
+}
+<span>SentinelAI</span>
+</h2>
+  
   <div className="relative flex gap-3">
     <input
       value={prompt}
@@ -339,7 +355,10 @@ export default function DashboardPage() {
   {/* Active Campaigns */}
   <div className="rounded-2xl bg-white shadow-md border border-gray-200 p-5">
     <div className="flex items-center justify-between mb-4">
-      <h2 className="text-xl font-semibold text-gray-900">Active Campaigns</h2>
+      <h2 className="flex items-center gap-1 text-xl font-semibold text-gray-900">
+        <Archive className="h-5 w-5 text-gray-600 fill-green-500" /> 
+        <span>Active Campaigns</span>
+        </h2>
       <button
         onClick={() => navigate("/campaigns/new")}
         className="rounded-xl border border-purple-300 bg-purple-50 px-3 py-2 text-sm font-semibold text-purple-700 hover:bg-purple-100"
@@ -361,8 +380,12 @@ export default function DashboardPage() {
 
 
   {/* RIGHT COLUMN — LIVE ALERTS */}
-<aside className="flex min-h-0 flex-col rounded-2xl bg-white shadow-md border border-gray-200 p-4">
-  <div className="text-base font-semibold text-gray-900 border-b pb-2 mb-3">Live Alerts</div>
+<aside className="flex min-h-0 flex-col rounded-2xl bg-purple-50 shadow-lg border border-gray-200 p-4">
+  <div className="flex items-center gap-2 text-base font-semibold text-gray-900 pb-2 mb-3">
+
+   <Bell className="h-5 w-5 text-gray-600 fill-red-500" /> 
+    <span>Live Alerts</span>
+  </div>
 
   <div className="flex-1 min-h-0 space-y-3 overflow-auto pr-1">
     <AnimatePresence initial={false}>
