@@ -387,7 +387,7 @@ export default function DashboardPage() {
   </div>
 
   <button
-    onClick={() => navigate("/alerts")}
+    onClick={() => navigate("/archive")}
     className="mt-4 rounded-xl bg-purple-500 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-600 active:scale-[0.98]"
   >
     View All Alerts
