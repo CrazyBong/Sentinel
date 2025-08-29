@@ -15,7 +15,7 @@ function SavedQueryItem({ title, lastAccessed, onClick }) {
   return (
     <button
       onClick={onClick}
-      className="w-full text-left rounded-xl border border-gray-200 bg-white px-3 py-2 hover:bg-gray-50"
+      className="w-full text-left rounded-lg border border-purple-200 bg-white px-3 py-2 hover:bg-purple-50 transition-colors shadow-sm"
     >
       <div className="text-sm font-semibold text-gray-900">{title}</div>
       <div className="text-xs text-gray-500">Last accessed: {lastAccessed}</div>
@@ -26,7 +26,7 @@ function RecentItem({ title, started, onClick }) {
   return (
     <button
       onClick={onClick}
-      className="w-full text-left rounded-xl border border-gray-200 bg-white px-3 py-2 hover:bg-gray-50"
+     className="w-full text-left rounded-lg border border-purple-200 bg-white px-3 py-2 hover:bg-purple-50 transition-colors shadow-sm"
     >
       <div className="text-sm font-semibold text-gray-900">{title}</div>
       <div className="text-xs text-gray-500">Started: {started}</div>
@@ -142,16 +142,16 @@ export default function AIAssistantPage() {
   return (
     <div className="h-screen w-full overflow-hidden bg-gray-50">
       {/* Top bar */}
-      <header className="flex items-center justify-between gap-4 border-b bg-white px-5 py-10 mt-4">
-        <div className="flex items-center gap-6 w-[48%]">
-          <div className="text-2xl font-bold text-purple-700 whitespace-nowrap">
-            Project Sentinel
-          </div>
+      <header className="flex items-center justify-between gap-4 border-b bg-white px-6 py-4">
+  <div className="flex items-center gap-6 w-[48%]">
+    <div className="text-xl font-bold text-purple-700 whitespace-nowrap">
+      Project Sentinel
+    </div>
           <input
             value={globalSearch}
             onChange={(e) => setGlobalSearch(e.target.value)}
             placeholder="Search campaigns, alerts, or evidence…"
-            className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:ring-4 focus:ring-purple-200"
+          className="w-full text-left rounded-lg border border-purple-200 bg-white px-3 py-2 hover:bg-purple-50 transition-colors shadow-sm"
           />
         </div>
         <div className="flex items-center gap-4">
@@ -161,35 +161,35 @@ export default function AIAssistantPage() {
           >
             Ask AI
           </button>
-          <div className="flex items-center gap-3 rounded-xl border px-4 py-3">
-            <div className="h-10 w-10 rounded-full bg-purple-200" />
-            <div className="leading-tight">
-              <div className="text-base font-semibold">Emma Chen</div>
-              <div className="text-sm text-gray-500">Senior Analyst</div>
+          <div className="flex items-center gap-3 rounded-xl border px-3 py-2 h-[44px]">
+              <div className="h-8 w-8 rounded-full bg-purple-200" />
+              <div className="leading-tight">
+                <div className="text-sm font-semibold">Emma Chen</div>
+                <div className="text-xs text-gray-500">Senior Analyst</div>
+              </div>
             </div>
-          </div>
-        </div>
+        </div>      
       </header>
 
       {/* Layout matches Analytics now */}
-      <div className="row-start-2 flex h-[calc(100vh-96px)]">
+    <div className="row-start-2 flex h-[calc(100vh-96px)] mt-4">
         {/* Left nav */}
         <Sidebar />
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 min-h-0 p-6 overflow-hidden">
           <div className="grid h-full min-h-0 grid-cols-[300px_1fr] gap-4">
             
             {/* Saved queries + recent */}
-            <aside className="flex min-h-0 flex-col gap-3 rounded-2xl border bg-white p-3 overflow-hidden">
-              <div className="text-xs font-semibold text-gray-500 px-1">Saved Queries</div>
+           <aside className="flex min-h-0 flex-col gap-4 rounded-lg border bg-white p-4 shadow-md overflow-hidden">
+              <div className="text-xs font-semibold text-purple-600 px-1">Saved Queries</div>
               <input
                 value={savedQuerySearch}
                 onChange={(e) => setSavedQuerySearch(e.target.value)}
                 placeholder="Search saved queries"
                 className="mb-2 rounded-xl border border-gray-300 px-3 py-2 outline-none focus:ring-4 focus:ring-purple-200"
               />
-              <div className="flex-1 min-h-0 space-y-2 overflow-auto pr-1">
+             <div className="flex-1 min-h-0 space-y-2 overflow-auto pr-1">
                 <AnimatePresence initial={false}>
                   {filteredSaved.map((s) => (
                     <motion.div
@@ -209,7 +209,7 @@ export default function AIAssistantPage() {
               </div>
 
               <div className="mt-2 border-t pt-3 min-h-0">
-                <div className="text-xs font-semibold text-gray-500 px-1 mb-2">
+                <div className="text-xs font-semibold text-purple-600 px-1 mb-2">
                   Recent Conversations
                 </div>
                 <div className="space-y-2 max-h-48 overflow-auto pr-1">
@@ -226,7 +226,7 @@ export default function AIAssistantPage() {
             </aside>
 
             {/* Chat column */}
-            <section className="flex min-h-0 flex-col rounded-2xl border bg-white">
+            <section className="flex min-h-0 flex-col rounded-lg border bg-white shadow-md">
               <div className="flex items-center justify-end gap-2 border-b p-3">
                 <button
                   onClick={saveConversation}
