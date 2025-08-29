@@ -265,10 +265,7 @@ export default function AnalyticsTrendsPage() {
   {/* Header with Filter icon */}
   <div className="mb-2 flex items-center justify-between">
     <SectionTitle>Platform Distribution</SectionTitle>
-    <button className="flex items-center gap-1 text-gray-600 text-sm hover:text-gray-800">
-      <span className="material-icons text-base">Icon_alt </span> {/* or use Heroicons */}
-      Filter
-    </button>
+   
   </div>
 
   <div className="flex items-center">
