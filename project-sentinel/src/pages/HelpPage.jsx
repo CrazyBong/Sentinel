@@ -6,6 +6,7 @@ import Sidebar from "@/components/ui/Sidebar"
 import { Button } from "@/components/ui/button"
 
 export default function HelpPage() {
+  const navigate = useNavigate()
   const [activeSection, setActiveSection] = useState("getting-started")
   const [expandedFaq, setExpandedFaq] = useState(null)
 
