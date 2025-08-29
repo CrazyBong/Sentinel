@@ -150,19 +150,18 @@ export default function AnalyticsTrendsPage() {
 
   // Demo data functions for severity distribution
   const getDailySeverityData = () => ([
-    { name: "Low", value: 18, color: GREEN },
-    { name: "Medium", value: 34, color: ORANGE },
-    { name: "High", value: 31, color: RED },
-    { name: "Very High", value: 17, color: LAVENDER },
-  ])
+  { name: "Low", value: 18, color: "#C7D2FE" },       // light indigo
+  { name: "Medium", value: 34, color: "#A78BFA" },    // lavender
+  { name: "High", value: 31, color: "#8B5CF6" },      // purple
+  { name: "Very High", value: 17, color: "#7C3AED" }, // deep violet
+]);
 
   const getWeeklySeverityData = () => ([
-    { name: "Low", value: 25, color: GREEN },
-    { name: "Medium", value: 40, color: ORANGE },
-    { name: "High", value: 20, color: RED },
-    { name: "Very High", value: 15, color: LAVENDER },
-  ])
-
+  { name: "Low", value: 25, color: "#C7D2FE" },
+  { name: "Medium", value: 40, color: "#A78BFA" },
+  { name: "High", value: 20, color: "#8B5CF6" },
+  { name: "Very High", value: 15, color: "#7C3AED" },
+]);
   const platformColors = [PURPLE, LAVENDER, LIME, "#7dd3fc", "#c4b5fd"]
 
   return (
@@ -326,21 +325,21 @@ export default function AnalyticsTrendsPage() {
     <div className="flex gap-2">
       <button
         className={`rounded-lg px-3 py-1 text-sm font-medium ${
-          bucket === "day"
+          severityTimeframe === "daily"
             ? "bg-purple-100 text-purple-700"
             : "bg-gray-100 text-gray-600"
         }`}
-        onClick={() => setBucket("day")}
+        onClick={() => setSeverityTimeframe("daily")}
       >
         Daily
       </button>
       <button
         className={`rounded-lg px-3 py-1 text-sm font-medium ${
-          bucket === "week"
+         severityTimeframe === "weekly"
             ? "bg-purple-500 text-white"
             : "bg-gray-100 text-gray-600"
         }`}
-        onClick={() => setBucket("week")}
+        onClick={() => setSeverityTimeframe("weekly")}
       >
         Weekly
       </button>
@@ -351,7 +350,7 @@ export default function AnalyticsTrendsPage() {
     <ResponsiveContainer width="100%" height="100%">
       <PieChart>
         <Pie
-          data={severityDist}
+          data={severityTimeframe === "daily" ? getDailySeverityData() : getWeeklySeverityData()}
           cx="50%"
           cy="50%"
           outerRadius={90}
@@ -359,7 +358,7 @@ export default function AnalyticsTrendsPage() {
           labelLine={false}
           label={({ name, percent }) => `${name}`}
         >
-          {severityDist.map((entry, i) => (
+          {(severityTimeframe === "daily" ? getDailySeverityData() : getWeeklySeverityData()).map((entry, i) => (
             <Cell key={`cell-${i}`} fill={entry.color} />
           ))}
         </Pie>
@@ -391,7 +390,7 @@ export default function AnalyticsTrendsPage() {
                     <div className="mt-1 text-xs text-gray-600">Recurring in {n.occurrences} campaigns</div>
                   </div>
                 ))}
-              </div>
+              </div> 
             </Card>
           </div>
 
