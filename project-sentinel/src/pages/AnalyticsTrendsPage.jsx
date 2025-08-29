@@ -118,6 +118,9 @@ export default function AnalyticsTrendsPage() {
   // eslint-disable-next-line no-unused-vars
   const [aiDetection, setAiDetection] = useState(demoAIDetection())
 
+  // New state for severity timeframe
+  const [severityTimeframe, setSeverityTimeframe] = useState('daily')
+
   // Socket (demo wiring)
   useEffect(() => {
     const socket = io(SOCKET_URL, {
@@ -143,6 +146,21 @@ export default function AnalyticsTrendsPage() {
     const len = bucket === "week" ? 7 : bucket === "month" ? 28 : 12
     setSeries(makeSeries(len))
   }, [bucket])
+
+  // Demo data functions for severity distribution
+  const getDailySeverityData = () => ([
+    { name: "Low", value: 18, color: GREEN },
+    { name: "Medium", value: 34, color: ORANGE },
+    { name: "High", value: 31, color: RED },
+    { name: "Very High", value: 17, color: LAVENDER },
+  ])
+
+  const getWeeklySeverityData = () => ([
+    { name: "Low", value: 25, color: GREEN },
+    { name: "Medium", value: 40, color: ORANGE },
+    { name: "High", value: 20, color: RED },
+    { name: "Very High", value: 15, color: LAVENDER },
+  ])
 
   const platformColors = [PURPLE, LAVENDER, LIME, "#7dd3fc", "#c4b5fd"]
 
@@ -248,7 +266,7 @@ export default function AnalyticsTrendsPage() {
   <div className="mb-2 flex items-center justify-between">
     <SectionTitle>Platform Distribution</SectionTitle>
     <button className="flex items-center gap-1 text-gray-600 text-sm hover:text-gray-800">
-      <span className="material-icons text-base">filter_alt</span> {/* or use Heroicons */}
+      <span className="material-icons text-base">Icon_alt </span> {/* or use Heroicons */}
       Filter
     </button>
   </div>
@@ -262,7 +280,7 @@ export default function AnalyticsTrendsPage() {
             data={platformDist}
             dataKey="value"
             nameKey="name"
-            outerRadius={90}
+            outerRadius={80}
             innerRadius={0}   // ✅ solid pie, not donut
             labelLine={false}
           >
@@ -299,25 +317,80 @@ export default function AnalyticsTrendsPage() {
 
           {/* Heatmap/Severity + Narrative Trends */}
           <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]">
-            {/* Severity Distribution Pie (as Post Activity Heatmap proxy) */}
+            {/* Severity Distribution Pie (Post Activity) */}
             <Card className="p-4">
               <div className="mb-2 flex items-center justify-between">
                 <SectionTitle>Post Activity (by Severity)</SectionTitle>
                 <div className="flex items-center gap-1 text-xs">
-                  <span className="rounded-lg border px-2 py-1">Daily</span>
-                  <span className="rounded-lg border px-2 py-1">Weekly</span>
+                  <button
+                    onClick={() => {
+                      setSeverityTimeframe('daily')
+                      setSeverityDist(getDailySeverityData())
+                    }}
+                    className={`rounded-lg border px-2 py-1 transition-colors ${
+                      severityTimeframe === 'daily' 
+                        ? 'border-purple-500 bg-purple-50 text-purple-700' 
+                        : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    Daily
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSeverityTimeframe('weekly')
+                      setSeverityDist(getWeeklySeverityData())
+                    }}
+                    className={`rounded-lg border px-2 py-1 transition-colors ${
+                      severityTimeframe === 'weekly' 
+                        ? 'border-purple-500 bg-purple-50 text-purple-700' 
+                        : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    Weekly
+                  </button>
                 </div>
               </div>
-              <div className="h-56">
-                <ResponsiveContainer>
-                  <PieChart>
-                    <Pie data={severityDist} dataKey="value" nameKey="name" innerRadius={40} outerRadius={80}>
-                      {severityDist.map((seg, i) => <Cell key={i} fill={seg.color} />)}
-                    </Pie>
-                    <Legend />
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
+              
+              <div className="flex flex-col items-center">
+                {/* Pie Chart */}
+                <div className="h-88 w-full">
+                  <ResponsiveContainer>
+                    <PieChart>
+                      <Pie 
+                        data={severityDist} 
+                        dataKey="value" 
+                        nameKey="name" 
+                        innerRadius={60} 
+                        outerRadius={110}
+                        cy={120}
+                      >
+                        {severityDist.map((seg, i) => (
+                          <Cell 
+                            key={i} 
+                            fill={seg.color}
+                            className="transition-all duration-300" // Smooth transitions
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Legend */}
+                <div className="mt-4 flex justify-center gap-6">
+                  {severityDist.map((entry, i) => (
+                    <div key={entry.name} className="flex items-center gap-2">
+                      <div 
+                        className="h-3 w-3 rounded-full" 
+                        style={{ backgroundColor: entry.color }}
+                      />
+                      <span className="text-sm text-gray-600">
+                        {entry.name}: {entry.value}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </Card>
 
