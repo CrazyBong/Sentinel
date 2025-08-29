@@ -224,7 +224,7 @@ export default function DashboardPage() {
   const viewCampaign = useCallback((c) => navigate(`/campaigns/${c.id}`), [navigate])
 
   return (
-    <div className="h-screen w-full overflow-hidden bg-gray-50">
+    <div className=" min-h-screen bg-slate-100">
       {/* TOP BAR / HERO */}
       <header className="flex items-center justify-between gap-4 bg-white shadow-md px-5 py-3 rounded-b-2xl">
   {/* Logo on the left */}

@@ -28,12 +28,12 @@ export default function Sidebar() {
 
   return (
     <aside
-      className={`flex flex-col border-r bg-white transition-all duration-300 ${
-        open ? "w-60" : "w-16"
+      className={`flex flex-col border-lg bg-purple-100 transition-all duration-300 ${
+        open ? "w-52" : "w-16"
       }`}
     >
       {/* Top: toggle */}
-      <div className="flex items-center justify-between px-3 py-4 border-b">
+      <div className="flex items-center justify-between px-3 py-4 border-lg">
         {open && (
           <img
             src={ShieldLogo}
@@ -43,7 +43,7 @@ export default function Sidebar() {
         )}
         <button
           onClick={() => setOpen(!open)}
-          className="rounded p-1 hover:bg-purple-50"
+          className="rounded p-1 hover:bg-purple-100"
         >
           {open ? (
             <PanelLeftClose className="h-5 w-5 text-purple-600" />
@@ -62,10 +62,10 @@ export default function Sidebar() {
   className={({ isActive }) =>
     `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
       label === "Logout"
-        ? "text-gray-700 hover:bg-red-50 hover:text-red-700" // 🔴 logout hover red
+        ? "text-gray-900 hover:bg-red-100 hover:text-red-800" // 🔴 logout hover red
         : isActive
-        ? "bg-purple-100 text-purple-700"
-        : "text-gray-700 hover:bg-purple-50 hover:text-purple-700"
+        ? "bg-purple-200 text-purple-700"
+        : "text-gray-700 hover:bg-purple-200 hover:text-purple-700"
     }`
   }
 >
