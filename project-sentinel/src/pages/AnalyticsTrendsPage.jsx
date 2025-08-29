@@ -55,11 +55,12 @@ const demoPlatformDist = () => ([
 ])
 
 const demoSeverityDist = () => ([
-  { name: "Low", value: 18, color: GREEN },
-  { name: "Medium", value: 34, color: ORANGE },
-  { name: "High", value: 31, color: RED },
-  { name: "Very High", value: 17, color: LAVENDER },
+  { name: "Low", value: 18, color: "#C7D2FE" },       // light indigo
+  { name: "Medium", value: 34, color: "#A78BFA" },    // lavender
+  { name: "High", value: 31, color: "#8B5CF6" },      // purple
+  { name: "Very High", value: 17, color: "#7C3AED" }, // deep violet
 ])
+
 
 const demoNarratives = () => ([
   { title: "Election Interference", deltaPct: +12, occurrences: 42 },
@@ -318,81 +319,62 @@ export default function AnalyticsTrendsPage() {
           {/* Heatmap/Severity + Narrative Trends */}
           <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]">
             {/* Severity Distribution Pie (Post Activity) */}
-            <Card className="p-4">
-              <div className="mb-2 flex items-center justify-between">
-                <SectionTitle>Post Activity (by Severity)</SectionTitle>
-                <div className="flex items-center gap-1 text-xs">
-                  <button
-                    onClick={() => {
-                      setSeverityTimeframe('daily')
-                      setSeverityDist(getDailySeverityData())
-                    }}
-                    className={`rounded-lg border px-2 py-1 transition-colors ${
-                      severityTimeframe === 'daily' 
-                        ? 'border-purple-500 bg-purple-50 text-purple-700' 
-                        : 'hover:bg-gray-50'
-                    }`}
-                  >
-                    Daily
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSeverityTimeframe('weekly')
-                      setSeverityDist(getWeeklySeverityData())
-                    }}
-                    className={`rounded-lg border px-2 py-1 transition-colors ${
-                      severityTimeframe === 'weekly' 
-                        ? 'border-purple-500 bg-purple-50 text-purple-700' 
-                        : 'hover:bg-gray-50'
-                    }`}
-                  >
-                    Weekly
-                  </button>
-                </div>
-              </div>
-              
-              <div className="flex flex-col items-center">
-                {/* Pie Chart */}
-                <div className="h-88 w-full">
-                  <ResponsiveContainer>
-                    <PieChart>
-                      <Pie 
-                        data={severityDist} 
-                        dataKey="value" 
-                        nameKey="name" 
-                        innerRadius={60} 
-                        outerRadius={110}
-                        cy={120}
-                      >
-                        {severityDist.map((seg, i) => (
-                          <Cell 
-                            key={i} 
-                            fill={seg.color}
-                            className="transition-all duration-300" // Smooth transitions
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
+            {/* Post Activity Heatmap */}
+<Card className="p-4">
+  <div className="flex items-center justify-between">
+    <h2 className="text-base font-semibold text-gray-900">Post Activity Heatmap</h2>
+    <div className="flex gap-2">
+      <button
+        className={`rounded-lg px-3 py-1 text-sm font-medium ${
+          bucket === "day"
+            ? "bg-purple-100 text-purple-700"
+            : "bg-gray-100 text-gray-600"
+        }`}
+        onClick={() => setBucket("day")}
+      >
+        Daily
+      </button>
+      <button
+        className={`rounded-lg px-3 py-1 text-sm font-medium ${
+          bucket === "week"
+            ? "bg-purple-500 text-white"
+            : "bg-gray-100 text-gray-600"
+        }`}
+        onClick={() => setBucket("week")}
+      >
+        Weekly
+      </button>
+    </div>
+  </div>
 
-                {/* Legend */}
-                <div className="mt-4 flex justify-center gap-6">
-                  {severityDist.map((entry, i) => (
-                    <div key={entry.name} className="flex items-center gap-2">
-                      <div 
-                        className="h-3 w-3 rounded-full" 
-                        style={{ backgroundColor: entry.color }}
-                      />
-                      <span className="text-sm text-gray-600">
-                        {entry.name}: {entry.value}%
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </Card>
+  <div className="mt-4 h-[280px] w-full rounded-xl bg-gray-50 p-4">
+    <ResponsiveContainer width="100%" height="100%">
+      <PieChart>
+        <Pie
+          data={severityDist}
+          cx="50%"
+          cy="50%"
+          outerRadius={90}
+          dataKey="value"
+          labelLine={false}
+          label={({ name, percent }) => `${name}`}
+        >
+          {severityDist.map((entry, i) => (
+            <Cell key={`cell-${i}`} fill={entry.color} />
+          ))}
+        </Pie>
+        <Legend
+          verticalAlign="bottom"
+          align="center"
+          layout="horizontal"
+          iconType="circle"
+          iconSize={10}
+        />
+      </PieChart>
+    </ResponsiveContainer>
+  </div>
+</Card>
+
 
             {/* Narrative Trends list */}
             <Card className="p-4">
