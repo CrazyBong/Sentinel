@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 // Pages
 import LoginPage from "@/pages/LoginPage"
 import SignupPage from "@/pages/SignupPage"
+import ForgotPasswordPage from "@/pages/ForgotPasswordPage"
 import DashboardPage from "@/pages/DashboardPage"
 import AIAssistantPage from "@/pages/AIAssistantPage"
 import CampaignDetailsPage from "@/pages/CampaignDetailsPage"
@@ -24,6 +25,7 @@ export default function App() {
           {/* Public routes */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
           {/* App routes */}
           <Route path="/dashboard" element={<DashboardPage />} />
