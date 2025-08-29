@@ -78,10 +78,13 @@ export default function Sidebar() {
 
       {/* Bottom help button */}
       <div className="p-3">
-        <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-purple-500 px-3 py-2 text-sm font-semibold text-white hover:bg-purple-600">
+        <NavLink
+          to="/help"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-purple-500 px-3 py-2 text-sm font-semibold text-white hover:bg-purple-600 transition-colors"
+        >
           <HelpCircle className="h-4 w-4" />
           {open && "Get Help"}
-        </button>
+        </NavLink>
       </div>
     </aside>
   )

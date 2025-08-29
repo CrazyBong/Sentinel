@@ -11,6 +11,7 @@ import CampaignDetailsPage from "@/pages/CampaignDetailsPage"
 import CampaignsArchivePage from "@/pages/CampaignsArchivePage"
 import AnalyticsTrendsPage from "@/pages/AnalyticsTrendsPage"
 import SettingsPage from "@/pages/SettingsPage"
+import HelpPage from "@/pages/HelpPage"
 
 // Minimal no-op boundary so the app never breaks if you don't have a custom one
 function ErrorOverlay({ children }) {
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="/analytics" element={<AnalyticsTrendsPage />} />
           <Route path="/campaigns/:id" element={<CampaignDetailsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/help" element={<HelpPage />} />
 
           {/* Redirects */}
           <Route path="/" element={<Navigate to="/login" replace />} />
