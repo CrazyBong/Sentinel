@@ -18,10 +18,34 @@ export default function LoginForm() {
     setLoading(true)
 
     try {
-      // TODO: Replace with your actual API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      localStorage.setItem("authToken", "dummy-token")
-      navigate("/dashboard")
+      const response = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          email,
+          password
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Login failed')
+      }
+
+      if (data.success) {
+        // Store the token and user data
+        localStorage.setItem("authToken", data.data.token)
+        localStorage.setItem("userData", JSON.stringify(data.data.user))
+        
+        // Navigate to dashboard
+        navigate("/dashboard")
+      } else {
+        throw new Error(data.message || 'Login failed')
+      }
     } catch (err) {
       setError(err.message || "Failed to login. Please try again.")
     } finally {
