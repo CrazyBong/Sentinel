@@ -355,6 +355,7 @@ export default function AnalyticsTrendsPage() {
           outerRadius={90}
           dataKey="value"
           labelLine={false}
+          // eslint-disable-next-line no-unused-vars
           label={({ name, percent }) => `${name}`}
         >
           {(severityTimeframe === "daily" ? getDailySeverityData() : getWeeklySeverityData()).map((entry, i) => (

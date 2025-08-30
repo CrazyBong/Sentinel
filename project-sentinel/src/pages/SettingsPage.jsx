@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react"
+// eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion"
 import Sidebar from "@/components/ui/Sidebar"
 import { Button } from "@/components/ui/button"
@@ -121,6 +122,7 @@ export default function SettingsPage() {
       
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
+      // eslint-disable-next-line no-unused-vars
     } catch (err) {
       setError("Failed to save settings. Please try again.")
     } finally {

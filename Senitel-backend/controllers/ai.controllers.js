@@ -5,7 +5,7 @@ import Alert from '../models/alert.model.js';
 import socketService from '../services/socketService.js';
 import Joi from 'joi';
 
-const geminiService = new GeminiService('AIzaSyBHp2pZwn-CYKGjHwoOeYJ24HSrkXFhFvY');
+const geminiService = new GeminiService('');
 
 // Validation schemas
 const analyzeTweetSchema = Joi.object({
