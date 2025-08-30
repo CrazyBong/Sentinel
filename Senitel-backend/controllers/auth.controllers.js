@@ -4,7 +4,7 @@ import Joi from 'joi';
 
 // Validation schemas
 const registerSchema = Joi.object({
-  name: Joi.string().trim().min(2).max(50).required().messages({
+  username: Joi.string().trim().min(2).max(50).required().messages({
     'string.empty': 'Name is required',
     'string.min': 'Name must be at least 2 characters long',
     'string.max': 'Name cannot exceed 50 characters'
@@ -40,7 +40,7 @@ export const register = async (req, res) => {
       });
     }
 
-    const { name, email, password } = value;
+    const { username, email, password } = value;
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -53,7 +53,7 @@ export const register = async (req, res) => {
 
     // Create new user
     const user = new User({
-      name,
+      username,
       email,
       password
     });
