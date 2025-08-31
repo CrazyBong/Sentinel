@@ -1,10 +1,11 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import fs from 'fs';
-import path from 'path';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 class GeminiService {
-  constructor() {
-    this.apiKey = process.env.GEMINI_API_KEY;
+  constructor(apiKey) {
+    this.apiKey = apiKey || 'AIzaSyBHp2pZwn-CYKGjHwoOeYJ24HSrkXFhFvY';
     this.modelName = process.env.GEMINI_MODEL || 'gemini-1.5-pro';
     
     if (!this.apiKey) {
