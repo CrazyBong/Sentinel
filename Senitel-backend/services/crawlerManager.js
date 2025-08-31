@@ -16,7 +16,6 @@ class CrawlerManager {
     this.autoInitStarted = false;
     this.aiProcessingService = new AIProcessingService();
     
-    // Don't auto-initialize in constructor - wait for manual trigger
   }
 
   // Set socket service reference
@@ -34,7 +33,6 @@ class CrawlerManager {
     console.log('🚀 Starting Crawler Manager auto-initialization...');
     
     try {
-      // Wait for all services to be ready
       await new Promise(resolve => setTimeout(resolve, 5000));
       
       await this.initialize();
@@ -313,7 +311,12 @@ class CrawlerManager {
 
       for (const query of searchQueries) {
         try {
-          const result = await this.crawlerInstance.crawlTopic(query, Math.ceil(maxTweets / searchQueries.length));
+          // ✅ Pass campaignId to crawlTopic
+          const result = await this.crawlerInstance.crawlTopic(
+            query, 
+            campaign._id,  // Pass campaign ID here
+            Math.ceil(maxTweets / searchQueries.length)
+          );
           
           if (result && result.success) {
             totalNewTweets += result.totalSaved || 0;
@@ -532,31 +535,28 @@ class CrawlerManager {
       const activeCampaigns = await Campaign.find({ 
         status: 'active', 
         isArchived: false 
-      });
-      
-      console.log(`🔄 Found ${activeCampaigns.length} active campaigns to start crawling`);
-      
+      }).limit(2);  // ✅ Limit to 2 campaigns max
+    
+      console.log(`🔄 Found ${activeCampaigns.length} active campaigns (limited to 2 for stability)`);
+    
       if (activeCampaigns.length === 0) {
-        console.log('📝 No active campaigns found');
+        console.log('❌ No active campaigns found');
         return;
       }
 
-      for (const campaign of activeCampaigns) {
-        const started = await this.startCampaignCrawling(campaign);
-        if (started) {
-          console.log(`✅ Started crawling for campaign: ${campaign.name}`);
-        } else {
-          console.log(`❌ Failed to start crawling for campaign: ${campaign.name}`);
-        }
+      // Start campaigns with staggered timing
+      for (let i = 0; i < activeCampaigns.length; i++) {
+        const campaign = activeCampaigns[i];
         
-        // Small delay between starting campaigns
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Add delay between starting campaigns
+        setTimeout(async () => {
+          await this.startCampaignCrawling(campaign);
+        }, i * 30000); // 30 seconds apart
       }
-      
-      console.log(`🚀 Campaign crawling setup complete: ${this.activeCrawlers.size} active crawlers`);
-      
+
+      console.log(`🚀 Campaign crawling setup complete: ${activeCampaigns.length} active crawlers`);
     } catch (error) {
-      console.error('❌ Failed to start existing campaigns:', error);
+      console.error('❌ Error starting campaigns:', error);
     }
   }
 

@@ -152,9 +152,9 @@ class TwitterCrawler {
     }
   }
 
-  async crawlSingleCampaign(topic, maxTweets = 20) {
+  async crawlSingleCampaign(topic, campaignId, maxTweets = 20) {
     try {
-      console.log(`🎯 Starting single campaign crawl: "${topic}" (max: ${maxTweets} tweets)`);
+      console.log(`🎯 Starting single campaign crawl: "${topic}" for campaign ${campaignId} (max: ${maxTweets} tweets)`);
       
       if (!this.isLoggedIn) {
         throw new Error('Not logged in to X');
@@ -181,7 +181,7 @@ class TwitterCrawler {
           pageText.includes('Try again')) {
         console.log('⚠️ Detected rate limiting, waiting 60 seconds...');
         await new Promise(resolve => setTimeout(resolve, 60000));
-        return await this.crawlSingleCampaign(topic, maxTweets);
+        return await this.crawlSingleCampaign(topic, campaignId, maxTweets);
       }
       
       // Scroll a few times to load tweets
@@ -269,7 +269,7 @@ class TwitterCrawler {
             continue;
           }
 
-          // Create tweet data
+          // Create tweet data with campaignId
           const tweetData = {
             tweetId: tweet.tweetId,
             username: tweet.username,
@@ -277,7 +277,8 @@ class TwitterCrawler {
             content: tweet.content,
             timestamp: tweet.timestamp,
             crawledAt: new Date(),
-            searchTopic: topic,
+            campaignId: campaignId,  // ✅ Campaign ID added here
+            searchTopic: topic,      // Keep for backward compatibility
             likes: tweet.likes,
             retweets: tweet.retweets,
             replies: tweet.replies,
@@ -301,9 +302,9 @@ class TwitterCrawler {
               joinedDate: null
             },
             source: 'twitter',
-            crawlerVersion: '2.3.0-single',
+            crawlerVersion: '2.3.0-campaign',
             
-            // ADD THIS: Initialize empty aiAnalysis structure
+            // Initialize empty aiAnalysis structure
             aiAnalysis: {
               sentiment: {
                 score: null,
@@ -348,7 +349,7 @@ class TwitterCrawler {
           const newTweet = new Tweet(tweetData);
           await newTweet.save();
           savedTweets.push(newTweet);
-          console.log(`💾 Saved tweet from @${tweet.username}`);
+          console.log(`💾 Saved tweet from @${tweet.username} for campaign ${campaignId}`);
 
         } catch (error) {
           console.error('Error saving tweet:', error.message);
@@ -384,8 +385,8 @@ class TwitterCrawler {
     }
   }
 
-  // Main method called by crawler manager
-  async crawlTopic(topic, maxTweets = 20) {
+  // ✅ Updated main method to accept campaignId
+  async crawlTopic(topic, campaignId, maxTweets = 20) {
     // If already processing a campaign, wait
     if (this.activeCampaign) {
       console.log(`⏳ Another campaign "${this.activeCampaign}" in progress, skipping "${topic}"`);
@@ -399,7 +400,7 @@ class TwitterCrawler {
       };
     }
 
-    return await this.crawlSingleCampaign(topic, maxTweets);
+    return await this.crawlSingleCampaign(topic, campaignId, maxTweets);
   }
 
   async close() {

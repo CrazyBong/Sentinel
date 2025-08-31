@@ -79,6 +79,12 @@ const tweetSchema = new mongoose.Schema({
   inReplyTo: String,
   conversationId: String,
   lang: String,
+  campaignId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Campaign',
+    required: true,
+    index: true
+  },
   
   // ADD THIS: Complete AI Analysis Schema
   aiAnalysis: {
@@ -91,7 +97,7 @@ const tweetSchema = new mongoose.Schema({
     threat_assessment: {
       level: { 
         type: String, 
-        enum: ['low', 'medium', 'high', 'critical'], 
+        enum: ['low', 'medium', 'high', 'critical', null],  // ✅ Add null
         default: null 
       },
       score: { type: Number, min: 0, max: 1, default: null },
@@ -120,12 +126,12 @@ const tweetSchema = new mongoose.Schema({
     recommendations: {
       action: { 
         type: String, 
-        enum: ['monitor', 'investigate', 'flag', 'escalate'], 
+        enum: ['monitor', 'investigate', 'flag', 'escalate', null],  // ✅ Add null
         default: null 
       },
       priority: { 
         type: String, 
-        enum: ['low', 'medium', 'high', 'critical'], 
+        enum: ['low', 'medium', 'high', 'critical', null],  // ✅ Add null
         default: null 
       },
       next_steps: [String]
