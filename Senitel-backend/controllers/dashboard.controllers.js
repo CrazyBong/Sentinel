@@ -40,10 +40,25 @@ export const getDashboardOverview = async (req, res) => {
       analyticsDataService.cache.clear();
     }
 
-    const overview = await analyticsDataService.getDashboardOverview(
-      req.user._id,
-      timeRange
-    );
+    // Add better error handling for MongoDB aggregation issues
+    let overview;
+    try {
+      overview = await analyticsDataService.getDashboardOverview(
+        req.user._id,
+        timeRange
+      );
+    } catch (dbError) {
+      // Check for specific MongoDB aggregation errors
+      if (dbError.code === 168 && dbError.codeName === 'InvalidPipelineOperator') {
+        console.error('MongoDB aggregation pipeline error - $exists used incorrectly:', dbError.message);
+        return res.status(500).json({
+          success: false,
+          message: 'Database query error - please check aggregation pipeline',
+          error: 'Invalid aggregation operator usage'
+        });
+      }
+      throw dbError; // Re-throw other errors
+    }
 
     res.json({
       success: true,
@@ -60,7 +75,8 @@ export const getDashboardOverview = async (req, res) => {
     console.error('Dashboard overview error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to get dashboard overview'
+      message: 'Failed to get dashboard overview',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -92,7 +108,8 @@ export const getRealtimeData = async (req, res) => {
     console.error('Realtime data error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to get realtime data'
+      message: 'Failed to get realtime data',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -124,7 +141,8 @@ export const getSystemMetrics = async (req, res) => {
     console.error('System metrics error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to get system metrics'
+      message: 'Failed to get system metrics',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -156,7 +174,8 @@ export const getPerformanceAnalytics = async (req, res) => {
     console.error('Performance analytics error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to get performance analytics'
+      message: 'Failed to get performance analytics',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -189,7 +208,8 @@ export const getActivityFeed = async (req, res) => {
     console.error('Activity feed error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to get activity feed'
+      message: 'Failed to get activity feed',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -211,7 +231,8 @@ export const getQuickStats = async (req, res) => {
     console.error('Quick stats error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to get quick stats'
+      message: 'Failed to get quick stats',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -258,7 +279,8 @@ export const exportAnalyticsData = async (req, res) => {
     console.error('Export analytics error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to export analytics data'
+      message: 'Failed to export analytics data',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -290,7 +312,8 @@ export const getCampaignAnalytics = async (req, res) => {
     console.error('Campaign analytics error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to get campaign analytics'
+      message: 'Failed to get campaign analytics',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -324,7 +347,8 @@ export const getAlertAnalytics = async (req, res) => {
     console.error('Alert analytics error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to get alert analytics'
+      message: 'Failed to get alert analytics',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -364,7 +388,8 @@ export const getThreatIntelligence = async (req, res) => {
     console.error('Threat intelligence error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to get threat intelligence'
+      message: 'Failed to get threat intelligence',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };

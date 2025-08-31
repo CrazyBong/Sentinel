@@ -12,16 +12,16 @@ const tagSchema = new mongoose.Schema({
   color: {
     type: String,
     default: '#3B82F6',
-    match: /^#[0-9A-F]{6}$/i
+    validate: {
+      validator: function(v) {
+        return /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(v);
+      },
+      message: 'Color must be a valid hex color'
+    }
   },
   description: {
     type: String,
     maxlength: 200
-  },
-  category: {
-    type: String,
-    enum: ['topic', 'priority', 'status', 'custom'],
-    default: 'custom'
   },
   usageCount: {
     type: Number,
@@ -32,7 +32,7 @@ const tagSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
-  isSystemTag: {
+  isSystem: {
     type: Boolean,
     default: false
   }
@@ -41,7 +41,7 @@ const tagSchema = new mongoose.Schema({
 });
 
 tagSchema.index({ name: 1 });
-tagSchema.index({ category: 1 });
 tagSchema.index({ usageCount: -1 });
+tagSchema.index({ createdBy: 1 });
 
 export default mongoose.model('Tag', tagSchema);

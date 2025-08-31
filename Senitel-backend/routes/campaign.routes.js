@@ -6,7 +6,12 @@ import {
   updateCampaign,
   archiveCampaign,
   addCampaignNote,
-  getCampaignAnalytics
+  getCampaignAnalytics,
+  getCampaignNotes,
+  updateCampaignNote,
+  deleteCampaignNote,
+  getCampaignStats,
+  updateCampaignStatus
 } from '../controllers/campaign.controllers.js';
 import { authMiddleware } from '../middlewares/auth.js';
 
@@ -19,10 +24,17 @@ router.get('/:id', authMiddleware, getCampaignById);
 router.put('/:id', authMiddleware, updateCampaign);
 router.delete('/:id', authMiddleware, archiveCampaign);
 
+// Campaign status updates
+router.patch('/:id/status', authMiddleware, updateCampaignStatus);
+
 // Campaign notes
 router.post('/:id/notes', authMiddleware, addCampaignNote);
+router.get('/:id/notes', authMiddleware, getCampaignNotes);
+router.put('/:id/notes/:noteId', authMiddleware, updateCampaignNote);
+router.delete('/:id/notes/:noteId', authMiddleware, deleteCampaignNote);
 
-// Campaign analytics
+// Campaign analytics and stats
 router.get('/:id/analytics', authMiddleware, getCampaignAnalytics);
+router.get('/:id/stats', authMiddleware, getCampaignStats);
 
 export default router;

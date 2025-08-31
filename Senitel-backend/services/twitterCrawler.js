@@ -5,42 +5,65 @@ import UserAgent from 'user-agents';
 class TwitterCrawler {
   constructor() {
     this.browser = null;
+    this.context = null;
     this.page = null;
     this.isLoggedIn = false;
     this.userAgent = new UserAgent();
+    this.sessionCookies = null;
+    this.loginInProgress = false;
+    this.activeCampaign = null;
+    this.lastActivity = Date.now();
   }
 
   async init() {
     try {
-      // Launch browser with stealth mode
+      console.log('🚀 Initializing Twitter Crawler...');
+      
+      // Close existing browser if any
+      if (this.browser) {
+        await this.close();
+      }
+      
+      // Launch browser with minimal settings for stability
       this.browser = await chromium.launch({
-        headless: false, // Set to true for production
+        headless: false,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
           '--no-first-run',
-          '--no-zygote',
           '--disable-gpu',
           '--disable-web-security',
-          '--disable-features=VizDisplayCompositor'
+          '--disable-blink-features=AutomationControlled',
+          '--no-default-browser-check'
         ]
       });
 
-      this.page = await this.browser.newPage({
+      // Create single persistent context
+      this.context = await this.browser.newContext({
         userAgent: this.userAgent.toString(),
-        viewport: { width: 1366, height: 768 }
+        viewport: { width: 1366, height: 768 },
+        locale: 'en-US',
+        timezoneId: 'America/New_York'
       });
 
-      // Set longer timeouts
-      this.page.setDefaultTimeout(60000);
-      this.page.setDefaultNavigationTimeout(60000);
+      // Create single page
+      this.page = await this.context.newPage();
 
-      // Block unnecessary resources for faster loading
+      // Basic stealth
+      await this.page.addInitScript(() => {
+        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+        window.chrome = { runtime: {} };
+      });
+
+      // Set reasonable timeouts
+      this.page.setDefaultTimeout(45000);
+      this.page.setDefaultNavigationTimeout(45000);
+
+      // Minimal resource blocking - only block heavy stuff
       await this.page.route('**/*', (route) => {
         const resourceType = route.request().resourceType();
-        if (['image', 'stylesheet', 'font', 'media'].includes(resourceType)) {
+        if (['image', 'stylesheet', 'font'].includes(resourceType)) {
           route.abort();
         } else {
           route.continue();
@@ -48,6 +71,7 @@ class TwitterCrawler {
       });
 
       console.log('✅ Twitter crawler initialized');
+      return true;
     } catch (error) {
       console.error('❌ Failed to initialize crawler:', error);
       throw error;
@@ -56,378 +80,367 @@ class TwitterCrawler {
 
   async login(username, password) {
     try {
+      if (this.loginInProgress) {
+        console.log('⏳ Login already in progress, waiting...');
+        while (this.loginInProgress) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        return this.isLoggedIn;
+      }
+
+      this.loginInProgress = true;
+
       if (!this.page) await this.init();
 
       console.log('🔐 Logging into X...');
       
-      // Navigate to X login
+      // Navigate to login
       await this.page.goto('https://x.com/i/flow/login', {
         waitUntil: 'domcontentloaded',
-        timeout: 60000
+        timeout: 45000
       });
 
-      // Wait a bit for page to fully load
       await this.page.waitForTimeout(3000);
 
-      // Wait for username input and fill it
+      // Enter username
       console.log('👤 Entering username...');
       await this.page.waitForSelector('input[name="text"]', { timeout: 30000 });
-      await this.page.click('input[name="text"]');
       await this.page.fill('input[name="text"]', username);
       
-      // Click Next button
+      // Click Next
       console.log('➡️ Clicking Next...');
       await this.page.click('[role="button"]:has-text("Next")');
       
-      // Wait for password input
+      // Wait for password field
       console.log('🔒 Waiting for password field...');
       await this.page.waitForSelector('input[name="password"]', { timeout: 30000 });
-      await this.page.waitForTimeout(1000);
+      await this.page.waitForTimeout(2000);
       
-      // Fill password
+      // Enter password
       console.log('🔒 Entering password...');
-      await this.page.click('input[name="password"]');
       await this.page.fill('input[name="password"]', password);
       
-      // Click Log in button
+      // Click Log in
       console.log('🚀 Clicking Log in...');
       await this.page.click('[role="button"]:has-text("Log in")');
 
-      // Wait for login to complete - check for multiple possible success indicators
+      // Wait for login completion
       console.log('⏳ Waiting for login to complete...');
       try {
-        await Promise.race([
-          this.page.waitForURL('**/home', { timeout: 30000 }),
-          this.page.waitForSelector('[data-testid="SideNav_AccountSwitcher_Button"]', { timeout: 30000 }),
-          this.page.waitForSelector('[data-testid="primaryColumn"]', { timeout: 30000 })
-        ]);
-        
+        await this.page.waitForURL('**/home', { timeout: 30000 });
         this.isLoggedIn = true;
         console.log('✅ Successfully logged into X');
+        
+        this.loginInProgress = false;
         return true;
       } catch (waitError) {
-        // Check if we're actually logged in by looking for user elements
-        const isLoggedIn = await this.page.evaluate(() => {
-          return document.querySelector('[data-testid="SideNav_AccountSwitcher_Button"]') !== null ||
-                 document.querySelector('[data-testid="primaryColumn"]') !== null ||
-                 window.location.href.includes('/home');
-        });
-        
-        if (isLoggedIn) {
+        // Check if we're actually logged in
+        const currentUrl = this.page.url();
+        if (currentUrl.includes('/home')) {
           this.isLoggedIn = true;
-          console.log('✅ Successfully logged into X (verified by DOM)');
+          console.log('✅ Successfully logged into X');
+          this.loginInProgress = false;
           return true;
-        } else {
-          throw waitError;
         }
+        throw waitError;
       }
     } catch (error) {
       console.error('❌ X login failed:', error);
-      
-      // Take screenshot for debugging
-      try {
-        await this.page.screenshot({ path: 'login-error.png' });
-        console.log('📸 Login error screenshot saved as login-error.png');
-      } catch (screenshotError) {
-        console.log('Failed to take screenshot:', screenshotError.message);
-      }
-      
+      this.isLoggedIn = false;
+      this.loginInProgress = false;
       throw new Error('Failed to login to X');
     }
   }
 
-  async searchAndCrawl(topic, maxTweets = 10) {
+  async crawlSingleCampaign(topic, maxTweets = 20) {
     try {
+      console.log(`🎯 Starting single campaign crawl: "${topic}" (max: ${maxTweets} tweets)`);
+      
       if (!this.isLoggedIn) {
         throw new Error('Not logged in to X');
       }
 
-      console.log(`🔍 Searching for topic: ${topic}`);
-      
-      // Navigate to search with better error handling
+      // Set active campaign
+      this.activeCampaign = topic;
+
       const searchUrl = `https://x.com/search?q=${encodeURIComponent(topic)}&src=typed_query&f=live`;
       
+      console.log(`🔍 Navigating to search: ${topic}`);
       await this.page.goto(searchUrl, { 
         waitUntil: 'domcontentloaded',
-        timeout: 60000 
+        timeout: 45000 
       });
-
-      // Wait for page to load and then look for tweets
+      
+      // Wait for content to load
       await this.page.waitForTimeout(5000);
       
-      // Try different selectors for tweets
-      try {
-        await Promise.race([
-          this.page.waitForSelector('[data-testid="tweet"]', { timeout: 20000 }),
-          this.page.waitForSelector('article[data-testid="tweet"]', { timeout: 20000 }),
-          this.page.waitForSelector('[data-testid="cellInnerDiv"]', { timeout: 20000 })
-        ]);
-      } catch (selectorError) {
-        console.log('⚠️ Tweet selectors not found, trying alternative approach...');
+      // Check if we're blocked
+      const pageText = await this.page.textContent('body');
+      if (pageText.includes('Something went wrong') || 
+          pageText.includes('Rate limit exceeded') ||
+          pageText.includes('Try again')) {
+        console.log('⚠️ Detected rate limiting, waiting 60 seconds...');
+        await new Promise(resolve => setTimeout(resolve, 60000));
+        return await this.crawlSingleCampaign(topic, maxTweets);
+      }
+      
+      // Scroll a few times to load tweets
+      console.log('📜 Loading tweets...');
+      for (let i = 0; i < 3; i++) {
+        await this.page.evaluate(() => window.scrollBy(0, window.innerHeight));
         await this.page.waitForTimeout(3000);
       }
-
-      const tweets = [];
-      let retries = 0;
-      const maxRetries = 5;
-
-      while (tweets.length < maxTweets && retries < maxRetries) {
-        console.log(`📊 Extraction attempt ${retries + 1}/${maxRetries}, found ${tweets.length}/${maxTweets} tweets`);
-        
-        // Get current tweets on page
-        const currentTweets = await this.extractTweets(topic);
-        
-        // Add new tweets
-        for (const tweet of currentTweets) {
-          if (!tweets.some(t => t.tweetId === tweet.tweetId)) {
-            tweets.push(tweet);
-          }
-        }
-
-        if (tweets.length < maxTweets) {
-          // Scroll down to load more tweets
-          await this.page.evaluate(() => {
-            window.scrollTo(0, document.body.scrollHeight);
-          });
-          
-          // Wait for new content to load
-          await this.page.waitForTimeout(3000);
-          retries++;
-        } else {
-          break;
-        }
-      }
-
-      const limitedTweets = tweets.slice(0, maxTweets);
-      console.log(`✅ Extracted ${limitedTweets.length} tweets for topic: ${topic}`);
       
-      return limitedTweets;
-    } catch (error) {
-      console.error('❌ Failed to search and crawl:', error);
-      
-      // Take screenshot for debugging
-      try {
-        await this.page.screenshot({ path: 'search-error.png' });
-        console.log('📸 Search error screenshot saved as search-error.png');
-      } catch (screenshotError) {
-        console.log('Failed to take screenshot:', screenshotError.message);
-      }
-      
-      throw error;
-    }
-  }
-
-  async extractTweets(topic) {
-    try {
+      // Extract tweets
+      console.log(`📊 Extracting tweets for: ${topic}`);
       const tweets = await this.page.evaluate((searchTopic) => {
-        // Helper function to extract numbers from text
-        const extractNumber = (text) => {
-          if (!text) return 0;
-          const match = text.match(/[\d,]+/);
-          return match ? parseInt(match[0].replace(/,/g, '')) : 0;
-        };
-
-        // Try multiple selectors for tweets
-        const tweetSelectors = [
-          '[data-testid="tweet"]',
-          'article[data-testid="tweet"]',
-          '[data-testid="cellInnerDiv"] article'
-        ];
-
-        let tweetElements = [];
-        for (const selector of tweetSelectors) {
-          tweetElements = document.querySelectorAll(selector);
-          if (tweetElements.length > 0) break;
-        }
-
-        console.log(`Found ${tweetElements.length} tweet elements`);
+        const tweetElements = document.querySelectorAll('[data-testid="tweet"]');
         const extractedTweets = [];
 
-        tweetElements.forEach((tweetEl, index) => {
+        Array.from(tweetElements).slice(0, 15).forEach((tweetEl, index) => {
           try {
-            // Try multiple selectors for username
-            const usernameSelectors = [
-              '[data-testid="User-Name"] a[href*="/"]',
-              'a[href*="/"][role="link"]',
-              '[data-testid="User-Names"] a'
-            ];
-            
-            let usernameEl = null;
-            for (const selector of usernameSelectors) {
-              usernameEl = tweetEl.querySelector(selector);
-              if (usernameEl) break;
-            }
+            // Get username
+            const usernameEl = tweetEl.querySelector('[data-testid="User-Name"] a[href*="/"]');
+            const username = usernameEl ? usernameEl.href.split('/').pop() : null;
 
-            // Try multiple selectors for content
-            const contentSelectors = [
-              '[data-testid="tweetText"]',
-              '[lang] span',
-              'div[lang] span'
-            ];
-            
-            let contentEl = null;
-            for (const selector of contentSelectors) {
-              contentEl = tweetEl.querySelector(selector);
-              if (contentEl && contentEl.innerText.trim()) break;
-            }
+            // Get content
+            const contentEl = tweetEl.querySelector('[data-testid="tweetText"]');
+            const content = contentEl ? contentEl.innerText.trim() : '';
 
+            // Get timestamp
             const timeEl = tweetEl.querySelector('time');
+            const timestamp = timeEl ? timeEl.getAttribute('datetime') : new Date().toISOString();
 
-            // Skip if essential elements are missing
-            if (!usernameEl || !contentEl || !contentEl.innerText.trim()) {
+            // Skip if missing essentials
+            if (!username || !content || username === 'status') {
               return;
             }
 
-            const username = usernameEl.href ? usernameEl.href.split('/').pop() : `user_${index}`;
-            const content = contentEl.innerText.trim();
-            const timestamp = timeEl ? timeEl.getAttribute('datetime') : new Date().toISOString();
-            const tweetUrl = usernameEl.href || `https://x.com/${username}`;
-            
-            // Generate unique tweet ID
-            const tweetId = `${username}_${Date.parse(timestamp)}_${index}`;
-
-            // Extract engagement metrics with fallbacks
-            const likesEl = tweetEl.querySelector('[data-testid="like"]') || tweetEl.querySelector('[aria-label*="like"]');
-            const retweetsEl = tweetEl.querySelector('[data-testid="retweet"]') || tweetEl.querySelector('[aria-label*="repost"]');
-            const repliesEl = tweetEl.querySelector('[data-testid="reply"]') || tweetEl.querySelector('[aria-label*="repl"]');
-
-            const likes = likesEl ? extractNumber(likesEl.getAttribute('aria-label')) : 0;
-            const retweets = retweetsEl ? extractNumber(retweetsEl.getAttribute('aria-label')) : 0;
-            const replies = repliesEl ? extractNumber(repliesEl.getAttribute('aria-label')) : 0;
-
             // Get display name
-            const displayNameEl = tweetEl.querySelector('[data-testid="User-Name"] span') || 
-                                  tweetEl.querySelector('div[dir="ltr"] span');
+            const displayNameEl = tweetEl.querySelector('[data-testid="User-Name"] span:first-child');
             const displayName = displayNameEl ? displayNameEl.innerText : username;
 
-            extractedTweets.push({
+            // Create unique ID
+            const tweetId = `${username}_${Date.parse(timestamp)}_${index}`;
+
+            const tweetData = {
               tweetId,
               username,
               displayName,
               content,
               timestamp: new Date(timestamp),
-              likes,
-              retweets,
-              replies,
-              tweetUrl,
-              searchTopic
-            });
+              likes: 0,
+              retweets: 0,
+              replies: 0,
+              isRetweet: content.startsWith('RT @'),
+              hashtags: (content.match(/#\w+/g) || []).map(tag => tag.toLowerCase()),
+              mentions: (content.match(/@\w+/g) || []).map(mention => mention.substring(1)),
+              urls: [],
+              media: [],
+              searchTopic,
+              user: {
+                username,
+                displayName,
+                isVerified: !!tweetEl.querySelector('[data-testid="icon-verified"]')
+              }
+            };
+
+            extractedTweets.push(tweetData);
           } catch (err) {
-            console.error('Error extracting individual tweet:', err);
+            console.error('Error extracting tweet:', err);
           }
         });
 
         return extractedTweets;
       }, topic);
 
-      console.log(`📝 Extracted ${tweets.length} tweets from page`);
-      return tweets;
-    } catch (error) {
-      console.error('❌ Failed to extract tweets:', error);
-      return [];
-    }
-  }
+      console.log(`📝 Extracted ${tweets.length} tweets`);
 
-  async saveTweets(tweets) {
-    try {
+      // Save tweets to database
       const savedTweets = [];
-      
-      for (const tweetData of tweets) {
+      let duplicatesSkipped = 0;
+
+      for (const tweet of tweets) {
         try {
           // Check if tweet already exists
-          const existingTweet = await Tweet.findOne({ tweetId: tweetData.tweetId });
-          
-          if (!existingTweet) {
-            const tweet = new Tweet(tweetData);
-            await tweet.save();
-            savedTweets.push(tweet);
-            console.log(`💾 Saved tweet from @${tweetData.username}`);
-          } else {
-            console.log(`⏭️ Tweet from @${tweetData.username} already exists`);
+          const existingTweet = await Tweet.findOne({ tweetId: tweet.tweetId });
+          if (existingTweet) {
+            duplicatesSkipped++;
+            continue;
           }
-        } catch (saveError) {
-          console.error('Error saving individual tweet:', saveError);
+
+          // Create tweet data
+          const tweetData = {
+            tweetId: tweet.tweetId,
+            username: tweet.username,
+            displayName: tweet.displayName,
+            content: tweet.content,
+            timestamp: tweet.timestamp,
+            crawledAt: new Date(),
+            searchTopic: topic,
+            likes: tweet.likes,
+            retweets: tweet.retweets,
+            replies: tweet.replies,
+            isRetweet: tweet.isRetweet,
+            hashtags: tweet.hashtags,
+            mentions: tweet.mentions,
+            urls: tweet.urls,
+            media: tweet.media,
+            lang: 'en',
+            user: {
+              name: tweet.displayName,
+              username: tweet.username,
+              displayName: tweet.displayName,
+              isVerified: tweet.user.isVerified,
+              profileImageUrl: '',
+              followersCount: 0,
+              followingCount: 0,
+              description: '',
+              location: '',
+              url: '',
+              joinedDate: null
+            },
+            source: 'twitter',
+            crawlerVersion: '2.3.0-single',
+            
+            // ADD THIS: Initialize empty aiAnalysis structure
+            aiAnalysis: {
+              sentiment: {
+                score: null,
+                label: null,
+                confidence: null,
+                emotions: []
+              },
+              threat_assessment: {
+                level: null,
+                score: null,
+                factors: [],
+                potential_impact: null
+              },
+              content_analysis: {
+                topics: [],
+                keywords: [],
+                entities: [],
+                claims: []
+              },
+              risk_indicators: {
+                manipulation_tactics: [],
+                bot_likelihood: null,
+                coordination_signs: false
+              },
+              recommendations: {
+                action: null,
+                priority: null,
+                next_steps: []
+              },
+              analyzed: false,
+              analyzedAt: null
+            },
+            
+            processingFlags: {
+              analyzed: false,
+              classified: false,
+              sentimentAnalyzed: false
+            }
+          };
+
+          // Save to database
+          const newTweet = new Tweet(tweetData);
+          await newTweet.save();
+          savedTweets.push(newTweet);
+          console.log(`💾 Saved tweet from @${tweet.username}`);
+
+        } catch (error) {
+          console.error('Error saving tweet:', error.message);
         }
       }
 
-      console.log(`✅ Saved ${savedTweets.length} new tweets to database`);
-      return savedTweets;
-    } catch (error) {
-      console.error('❌ Failed to save tweets:', error);
-      throw error;
-    }
-  }
+      console.log(`✅ Campaign "${topic}" completed: ${savedTweets.length} new tweets saved, ${duplicatesSkipped} duplicates skipped`);
 
-  async crawlTopic(topic, maxTweets = 10) {
-    try {
-      console.log(`🎯 Starting crawl for topic: "${topic}" (max: ${maxTweets} tweets)`);
-      
-      // Search and extract tweets
-      const tweets = await this.searchAndCrawl(topic, maxTweets);
-      
-      if (tweets.length === 0) {
-        console.log('⚠️ No tweets extracted, possibly due to page structure changes');
-        return {
-          success: false,
-          topic,
-          error: 'No tweets found - page structure may have changed',
-          totalExtracted: 0,
-          totalSaved: 0,
-          tweets: []
-        };
-      }
-      
-      // Save to database
-      const savedTweets = await this.saveTweets(tweets);
-      
+      // Clear active campaign
+      this.activeCampaign = null;
+      this.lastActivity = Date.now();
+
       return {
         success: true,
-        topic,
         totalExtracted: tweets.length,
         totalSaved: savedTweets.length,
+        duplicatesSkipped,
         tweets: savedTweets
       };
+
     } catch (error) {
-      console.error(`❌ Failed to crawl topic ${topic}:`, error);
+      console.error(`❌ Failed to crawl campaign ${topic}:`, error);
+      this.activeCampaign = null;
+      
       return {
         success: false,
-        topic,
         error: error.message,
         totalExtracted: 0,
         totalSaved: 0,
+        duplicatesSkipped: 0,
         tweets: []
       };
     }
   }
 
+  // Main method called by crawler manager
+  async crawlTopic(topic, maxTweets = 20) {
+    // If already processing a campaign, wait
+    if (this.activeCampaign) {
+      console.log(`⏳ Another campaign "${this.activeCampaign}" in progress, skipping "${topic}"`);
+      return {
+        success: false,
+        error: 'Another campaign in progress',
+        totalExtracted: 0,
+        totalSaved: 0,
+        duplicatesSkipped: 0,
+        tweets: []
+      };
+    }
+
+    return await this.crawlSingleCampaign(topic, maxTweets);
+  }
+
   async close() {
     try {
+      console.log('🔴 Closing Twitter Crawler...');
+      
+      this.activeCampaign = null;
+      
+      if (this.page) {
+        await this.page.close();
+        this.page = null;
+      }
+      
+      if (this.context) {
+        await this.context.close();
+        this.context = null;
+      }
+      
       if (this.browser) {
         await this.browser.close();
-        console.log('✅ Browser closed');
+        this.browser = null;
       }
+      
+      this.isLoggedIn = false;
+      this.loginInProgress = false;
+      
+      console.log('✅ Twitter Crawler closed successfully');
     } catch (error) {
-      console.error('❌ Error closing browser:', error);
+      console.error('❌ Error closing crawler:', error);
     }
   }
 
-  // Method to check if still logged in
-  async checkLoginStatus() {
-    try {
-      if (!this.page) return false;
-      
-      const isLoggedIn = await this.page.evaluate(() => {
-        return document.querySelector('[data-testid="SideNav_AccountSwitcher_Button"]') !== null ||
-               document.querySelector('[data-testid="primaryColumn"]') !== null;
-      });
-      
-      this.isLoggedIn = isLoggedIn;
-      return isLoggedIn;
-    } catch (error) {
-      console.error('Error checking login status:', error);
-      this.isLoggedIn = false;
-      return false;
-    }
+  getStatus() {
+    return {
+      initialized: !!this.browser && !!this.page,
+      loggedIn: this.isLoggedIn,
+      loginInProgress: this.loginInProgress,
+      activeCampaign: this.activeCampaign,
+      lastActivity: this.lastActivity,
+      userAgent: this.userAgent.toString()
+    };
   }
 }
 

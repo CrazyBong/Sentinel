@@ -1,13 +1,14 @@
+/* eslint-disable no-unused-vars */
 // src/pages/DashboardPage.jsx
 import { useEffect, useMemo, useState, useCallback } from "react"
 import { Bell } from "lucide-react"
 import { Archive } from 'lucide-react';
-// eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "framer-motion"
 import { useNavigate } from "react-router-dom"
 import { Clock } from "lucide-react"               // keep lucide only for neutral icons
 import { LineChart, Line, ResponsiveContainer } from "recharts"
 import { io } from "socket.io-client"
+import axios from "axios"
 import Sidebar from "../components/ui/Sidebar"
 import AccountButton from "@/components/AccountButton"
 import ShieldLogo from "@/assets/shield.png"
@@ -15,7 +16,45 @@ import CampArchieve from "@/assets/archive.png"
 
 
 // --- CONFIG: set your Socket.IO endpoint here ---
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3001"
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:5000"
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api"
+
+// ---------- Axios configuration ----------
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 10000,
+});
+
+// Add request interceptor to include auth token
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Add response interceptor to handle responses
+api.interceptors.response.use(
+  (response) => {
+    return response.data;
+  },
+  (error) => {
+    console.error('API Error:', error);
+    if (error.response?.status === 401) {
+      // Handle unauthorized - redirect to login
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('userData');
+      window.location.href = '/';
+    }
+    return Promise.reject(error);
+  }
+);
 
 // ---------- inline brand icons (no runtime import issues) ----------
 function XIcon({ className = "w-4 h-4", ...props }) {
@@ -92,7 +131,7 @@ function LiveAlert({ item }) {
 // ---------- campaign card ----------
 function CampaignCard({ c, onView }) {
   const k = sevKey(c.severity)
-  const pct = Math.max(0, Math.min(100, c.activity || 0))
+  const pct = Math.max(0, Math.min(100, c.activity || c.activityScore || 0))
 
   return (
     <motion.div
@@ -104,15 +143,15 @@ function CampaignCard({ c, onView }) {
       }}
       transition={{
         type: "spring",
-        stiffness: 120, // kam stiffness
-        damping: 12,    // jyada damping for smoothness
+        stiffness: 120,
+        damping: 12,
       }}
       className="flex flex-col rounded-2xl border border-gray-200 bg-white p-4 shadow-sm cursor-pointer"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="space-y-1">
           <SeverityBadge level={c.severity} />
-          <div className="text-lg font-semibold text-gray-900">{c.title}</div>
+          <div className="text-lg font-semibold text-gray-900">{c.name || c.title}</div>
         </div>
         <button
           onClick={() => onView?.(c)}
@@ -144,10 +183,10 @@ function CampaignCard({ c, onView }) {
         <div className="flex items-center gap-2">
           <div className="h-8 w-8 rounded-full bg-purple-200" />
           <div className="text-xs text-gray-600">
-            <span className="font-medium">Lead:</span> {c.lead?.name || "—"}
+            <span className="font-medium">Lead:</span> {c.team?.[0]?.user?.name || c.lead?.name || "—"}
           </div>
         </div>
-        <div className="text-xs text-gray-500">{c.reposts || 0} reposts</div>
+        <div className="text-xs text-gray-500">{c.stats?.totalTweets || c.reposts || 0} posts</div>
       </div>
 
       <div className="mt-2">
@@ -163,9 +202,61 @@ function CampaignCard({ c, onView }) {
     </motion.div>
   );
 }
+
 // ---------- sample spark data ----------
 const sampleSpark = () =>
   Array.from({ length: 12 }, () => ({ v: 20 + Math.round(Math.random() * 60) }))
+
+// ---------- data transformation helpers ----------
+function transformAlert(alert) {
+  return {
+    id: alert._id,
+    title: alert.title,
+    description: alert.description,
+    severity: alert.severity,
+    platform: alert.metadata?.platform || "x",
+    timeAgo: timeAgo(alert.createdAt),
+  }
+}
+
+function transformCampaign(campaign) {
+  return {
+    id: campaign._id,
+    title: campaign.name,
+    name: campaign.name,
+    severity: campaign.severity || calculateSeverity(campaign),
+    description: campaign.description,
+    activity: campaign.activityScore,
+    activityScore: campaign.activityScore,
+    reposts: campaign.stats?.totalTweets || 0,
+    stats: campaign.stats,
+    team: campaign.team,
+    lead: campaign.team?.[0]?.user || { name: "Analyst" },
+    spark: generateSparkFromStats(campaign.stats),
+    updatedAgo: timeAgo(campaign.updatedAt),
+  }
+}
+
+function calculateSeverity(campaign) {
+  if (!campaign.stats) return "low";
+  
+  const { fakePosts = 0, totalTweets = 0, alertsGenerated = 0 } = campaign.stats;
+  const fakeRatio = totalTweets > 0 ? fakePosts / totalTweets : 0;
+  
+  if (alertsGenerated > 10 || fakeRatio > 0.7) return "high";
+  if (alertsGenerated > 5 || fakeRatio > 0.4) return "medium";
+  return "low";
+}
+
+function generateSparkFromStats(stats) {
+  if (!stats) return sampleSpark();
+  
+  // Generate sparkline based on activity pattern
+  const base = stats.totalTweets || 50;
+  return Array.from({ length: 12 }, (_, i) => ({
+    v: Math.max(10, base + Math.sin(i * 0.5) * 20 + Math.random() * 15)
+  }));
+}
 
 // ---------- page ----------
 export default function DashboardPage() {
@@ -180,26 +271,77 @@ export default function DashboardPage() {
     else navigate("/assistant")
   }, [prompt, navigate])
 
-  // Alerts (right column, real-time)
-  const [alerts, setAlerts] = useState(() => demoAlerts())
+  // Data states
+  const [alerts, setAlerts] = useState([])
+  const [campaigns, setCampaigns] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [dashboardData, setDashboardData] = useState(null)
 
-  // Campaigns (left cards, real-time)
-  const [campaigns, setCampaigns] = useState(() => demoCampaigns())
+  // Fetch initial data using axios
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      setLoading(true)
+      
+      try {
+        // Parallel API calls for dashboard data using axios
+        const [dashboardRes, alertsRes, campaignsRes] = await Promise.all([
+          api.get('/dashboard/overview'),
+          api.get('/alerts', { params: { status: 'open', limit: 20 } }),
+          api.get('/campaigns', { params: { status: 'active', limit: 20 } })
+        ]);
 
-  // Socket wiring
+        // Handle dashboard overview
+        if (dashboardRes.success && dashboardRes.data) {
+          setDashboardData(dashboardRes.data);
+        }
+
+        // Handle alerts
+        if (alertsRes.success && alertsRes.data?.alerts) {
+          const transformedAlerts = alertsRes.data.alerts.map(transformAlert);
+          setAlerts(transformedAlerts);
+        }
+
+        // Handle campaigns
+        if (campaignsRes.success && campaignsRes.data?.campaigns) {
+          const transformedCampaigns = campaignsRes.data.campaigns.map(transformCampaign);
+          setCampaigns(transformedCampaigns);
+        }
+
+      } catch (error) {
+        console.error('Failed to fetch dashboard data:', error);
+        // Fallback to demo data on error
+        setAlerts(demoAlerts());
+        setCampaigns(demoCampaigns());
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  // Socket wiring with real-time updates
   useEffect(() => {
     const socket = io(SOCKET_URL, {
       transports: ["websocket"],
       reconnection: true,
       reconnectionAttempts: 5,
+      auth: {
+        token: localStorage.getItem('authToken')
+      }
     })
 
     const onConnectError = (err) => console.error("Socket connection error:", err)
-    const onLiveAlert = (payload) => setAlerts((curr) => [formatAlert(payload), ...curr].slice(0, 30))
+    
+    const onLiveAlert = (payload) => {
+      const transformedAlert = transformAlert(payload);
+      setAlerts((curr) => [transformedAlert, ...curr].slice(0, 30));
+    }
+    
     const onCampaignUpdate = (payload) => {
       setCampaigns((curr) => {
-        const idx = curr.findIndex((x) => x.id === payload.id)
-        const incoming = normalizeCampaign(payload)
+        const idx = curr.findIndex((x) => x.id === payload.campaignId || payload._id)
+        const incoming = transformCampaign(payload)
         if (idx >= 0) {
           const clone = curr.slice()
           clone[idx] = { ...clone[idx], ...incoming }
@@ -209,17 +351,59 @@ export default function DashboardPage() {
       })
     }
 
+    const onDashboardUpdate = (payload) => {
+      if (payload.data) {
+        setDashboardData(prev => ({ ...prev, ...payload.data }));
+      }
+    }
+
+    // Socket event listeners
     socket.on("connect_error", onConnectError)
-    socket.on("live_alert", onLiveAlert)
+    socket.on("live_alerts_update", (data) => {
+      if (data.alerts) {
+        data.alerts.forEach(onLiveAlert);
+      }
+    })
     socket.on("campaign_update", onCampaignUpdate)
+    socket.on("dashboard_update", onDashboardUpdate)
+
+    // Subscribe to dashboard updates
+    socket.emit('subscribe_dashboard', {
+      preferences: {
+        alerts: true,
+        campaigns: true,
+        system: true
+      }
+    });
 
     return () => {
       socket.off("connect_error", onConnectError)
-      socket.off("live_alert", onLiveAlert)
+      socket.off("live_alerts_update")
       socket.off("campaign_update", onCampaignUpdate)
+      socket.off("dashboard_update", onDashboardUpdate)
       socket.disconnect()
     }
   }, [])
+
+  // Global search functionality using axios
+  const handleGlobalSearch = useCallback(async () => {
+    if (!globalSearch.trim()) return;
+    
+    try {
+      const response = await api.post('/search/universal', {
+        query: globalSearch,
+        contentTypes: ['campaigns', 'alerts', 'evidence'],
+        limit: 10
+      });
+      
+      if (response.success) {
+        // Navigate to search results page or handle results
+        navigate(`/search?q=${encodeURIComponent(globalSearch)}`);
+      }
+    } catch (error) {
+      console.error('Search failed:', error);
+    }
+  }, [globalSearch, navigate]);
 
   // Suggested topics
   const suggestions = useMemo(
@@ -228,6 +412,14 @@ export default function DashboardPage() {
   )
 
   const viewCampaign = useCallback((c) => navigate(`/campaigns/${c.id}`), [navigate])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
+        <div className="text-lg text-gray-600">Loading dashboard...</div>
+      </div>
+    );
+  }
 
   return (
     <div className=" min-h-screen bg-slate-100">
@@ -243,6 +435,7 @@ export default function DashboardPage() {
       <input
         value={globalSearch}
         onChange={(e) => setGlobalSearch(e.target.value)}
+        onKeyPress={(e) => e.key === 'Enter' && handleGlobalSearch()}
         placeholder="Search campaigns, alerts, or evidence…"
         className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-300 bg-gray-50 shadow-sm outline-none focus:ring-4 focus:ring-purple-200 transition"
       />
@@ -260,9 +453,9 @@ export default function DashboardPage() {
     </div>
     {/* Purple search icon button (replacing Ask AI) */}
     <button
-      onClick={() => navigate("/assistant")}
+      onClick={handleGlobalSearch}
       className="rounded-full bg-purple-500 p-1.5 shadow-sm hover:bg-purple-600 transition"
-      aria-label="Ask AI"
+      aria-label="Search"
     >
       <svg
         className="h-4 w-4 text-white"
@@ -294,14 +487,11 @@ export default function DashboardPage() {
   {/* SentinelAI box */}
   <div className="rounded-2xl bg-white shadow-md border border-gray-200 p-6 mb-6 flex flex-col gap-4">
   <h2 className="flex items-center gap-1 text-2xl font-bold text-gray-900">
-  {open && (
   <img
     src={ShieldLogo}
     alt="Sentinel Logo"
     className="h-8 w-8 object-contain"
   />
-)
-}
 <span>SentinelAI</span>
 </h2>
   
@@ -309,6 +499,7 @@ export default function DashboardPage() {
     <input
       value={prompt}
       onChange={(e) => setPrompt(e.target.value)}
+      onKeyPress={(e) => e.key === 'Enter' && askAI()}
       placeholder="e.g., Analyze recent disinformation trends in Eastern Europe…" 
       className="flex-1 pl-10 pr-4 py-3 rounded-xl border border-gray-300 bg-gray-50 shadow-sm outline-none focus:ring-4 focus:ring-purple-200 text-base transition"
     />
@@ -349,6 +540,9 @@ export default function DashboardPage() {
       <h2 className="flex items-center gap-1 text-xl font-semibold text-gray-900">
         <Archive className="h-5 w-5 text-gray-600 fill-green-500" /> 
         <span>Active Campaigns</span>
+        <span className="text-sm text-gray-500 ml-2">
+          ({dashboardData?.summary?.activeCampaigns || campaigns.length})
+        </span>
         </h2>
       <button
         onClick={() => navigate("/campaigns/new")}
@@ -376,6 +570,9 @@ export default function DashboardPage() {
 
    <Bell className="h-5 w-5 text-gray-600 fill-red-500" /> 
     <span>Live Alerts</span>
+    <span className="text-sm text-gray-500 ml-2">
+      ({dashboardData?.summary?.openAlerts || alerts.length})
+    </span>
   </div>
 
   <div className="flex-1 min-h-0 space-y-3 overflow-auto pr-1">
@@ -387,7 +584,7 @@ export default function DashboardPage() {
   </div>
 
   <button
-    onClick={() => navigate("/archive")}
+    onClick={() => navigate("/alerts")}
     className="mt-4 rounded-xl bg-purple-500 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-600 active:scale-[0.98]"
   >
     View All Alerts
@@ -415,7 +612,7 @@ function formatAlert(a) {
     title: a.title || "New Alert",
     description: a.description || "Incoming event detected by the monitoring pipeline.",
     severity: (a.severity || "low").toLowerCase(),
-    platform: (a.platform || "x").toLowerCase(), // "x" or "reddit"
+    platform: (a.platform || "x").toLowerCase(),
     timeAgo: timeAgo(a.timestamp),
   }
 }

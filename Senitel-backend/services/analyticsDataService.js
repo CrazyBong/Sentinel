@@ -307,6 +307,7 @@ class AnalyticsDataService {
       {
         $match: {
           createdAt: { $gte: since },
+          // Use $exists in $match - this is correct
           sentiment: { $exists: true }
         }
       },
@@ -330,6 +331,7 @@ class AnalyticsDataService {
       {
         $match: {
           createdAt: { $gte: since },
+          // Use $exists in $match - this is correct
           classification: { $exists: true }
         }
       },
@@ -465,7 +467,11 @@ class AnalyticsDataService {
           threats: {
             $sum: {
               $cond: [
-                { $and: [{ $exists: ['$threats'] }, { $gt: [{ $size: '$threats' }, 0] }] },
+                // Fixed: Replace $exists with proper aggregation operators
+                { $and: [
+                  { $ne: ['$threats', null] }, 
+                  { $gt: [{ $size: { $ifNull: ['$threats', []] } }, 0] }
+                ]},
                 1,
                 0
               ]
