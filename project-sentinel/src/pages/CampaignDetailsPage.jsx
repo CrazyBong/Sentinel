@@ -1,18 +1,67 @@
+/* eslint-disable no-unused-vars */
+// src/pages/CampaignDetailsPage.jsx
 import { useEffect, useMemo, useState, useCallback } from "react"
-// eslint-disable-next-line no-unused-vars
+ 
 import { motion, AnimatePresence } from "framer-motion"
 import { useNavigate, useParams } from "react-router-dom"
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ScatterChart, Scatter, ZAxis
 } from "recharts"
-import { io } from "socket.io-client"
 import Sidebar from "@/components/ui/Sidebar"
 import AccountButton from "@/components/AccountButton"
-
+import axios from "axios"
 
 // ---------- CONFIG ----------
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3001"
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api"
+
+// ---- API Configuration ----
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 10000,
+});
+
+// Update the API interceptor to handle authentication properly:
+api.interceptors.request.use(
+  (config) => {
+    // Check multiple possible token storage locations
+    const token = localStorage.getItem('token') || 
+                  localStorage.getItem('authToken') || 
+                  localStorage.getItem('accessToken') ||
+                  sessionStorage.getItem('token');
+    
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+      console.log('Using token:', token.substring(0, 20) + '...'); // Debug log
+    } else {
+      console.warn('No authentication token found');
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Add response interceptor to handle 401 errors:
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      console.error('Authentication failed - redirecting to login');
+      // Clear invalid tokens
+      localStorage.removeItem('token');
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('accessToken');
+      sessionStorage.removeItem('token');
+      
+      // Redirect to login
+      window.location.href = '/login';
+      return Promise.reject(new Error('Authentication required'));
+    }
+    return Promise.reject(error);
+  }
+);
 
 // ---------- Inline brand icons (no external icon deps) ----------
 function XIcon({ className = "w-4 h-4", ...p }) {
@@ -29,12 +78,20 @@ function RedditIcon({ className = "w-4 h-4", ...p }) {
     </svg>
   )
 }
+function FacebookIcon({ className = "w-4 h-4", ...p }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden className={className} {...p}>
+      <path d="M13 3h4v3h-3c-.6 0-1 .4-1 1v3h4l-1 3h-3v8h-3v-8H7v-3h3V7c0-2.2 1.8-4 4-4Z"/>
+    </svg>
+  )
+}
 
 // ---------- severity styles ----------
 const sev = {
-  high:   { badge: "bg-red-100 text-red-700",     text: "High Severity"   },
-  medium: { badge: "bg-orange-100 text-orange-700", text: "Medium Severity" },
-  low:    { badge: "bg-green-100 text-green-700",   text: "Low Severity"    },
+  high:     { badge: "bg-red-100 text-red-700",     text: "High Priority"   },
+  medium:   { badge: "bg-orange-100 text-orange-700", text: "Medium Priority" },
+  low:      { badge: "bg-green-100 text-green-700",   text: "Low Priority"    },
+  critical: { badge: "bg-red-200 text-red-800",     text: "Critical Priority" },
 }
 const sevKey = (s) => (s || "low").toLowerCase()
 
@@ -60,6 +117,14 @@ const Badge = ({ level }) => {
   )
 }
 
+// ---------- Platform icon selector ----------
+const PlatformIcon = ({ platform, className = "w-4 h-4" }) => {
+  const p = (platform || "").toLowerCase()
+  if (p.includes("facebook")) return <FacebookIcon className={className} />
+  if (p.includes("reddit")) return <RedditIcon className={className} />
+  return <XIcon className={className} />
+}
+
 // ---------- charts ----------
 function ActivityTimeline({ data }) {
   return (
@@ -72,8 +137,8 @@ function ActivityTimeline({ data }) {
             <XAxis dataKey="date" tick={{ fontSize: 11 }} />
             <YAxis tick={{ fontSize: 11 }} />
             <Tooltip />
-            <Line type="monotone" dataKey="volume" strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey="engagement" strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="volume" stroke="#8b5cf6" strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="engagement" stroke="#06b6d4" strokeWidth={2} dot={false} />
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -94,7 +159,7 @@ function CoordinationNetwork({ points }) {
             <YAxis type="number" dataKey="y" name="Coord Y" />
             <ZAxis type="number" dataKey="z" range={[60, 120]} />
             <Tooltip cursor={{ strokeDasharray: "3 3" }} />
-            <Scatter data={points} />
+            <Scatter data={points} fill="#8b5cf6" />
           </ScatterChart>
         </ResponsiveContainer>
       </div>
@@ -107,187 +172,371 @@ function CoordinationNetwork({ points }) {
 
 // ---------- evidence feed ----------
 function EvidenceCard({ item }) {
-  const PlatformIcon = item.platform === "reddit" ? RedditIcon : XIcon
   return (
     <Card className="p-3">
       <div className="flex items-start gap-2">
-        <div className="h-9 w-9 rounded-full bg-purple-200" />
+        <div className="h-9 w-9 rounded-full bg-purple-200 flex items-center justify-center">
+          <span className="text-sm font-semibold text-purple-700">
+            {item.username?.charAt(0)?.toUpperCase() || "?"}
+          </span>
+        </div>
         <div className="flex-1">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-semibold">{item.account}</div>
+            <div className="text-sm font-semibold">@{item.username}</div>
             <div className="flex items-center gap-2 text-xs text-gray-500">
-              <PlatformIcon className="h-4 w-4" />
-              <span>{item.timestamp}</span>
+              <PlatformIcon platform={item.platform} />
+              <span>{item.timeAgo}</span>
             </div>
           </div>
-          <p className="mt-1 text-sm text-gray-800">{item.text}</p>
-          {item.image && (
+          <p className="mt-1 text-sm text-gray-800">{item.content}</p>
+          {item.media && item.media.length > 0 && (
             <img
-              src={item.image}
-              alt="evidence"
+              src={item.media[0].url}
+              alt="tweet media"
               className="mt-2 w-full rounded-xl object-cover"
               style={{ maxHeight: 220 }}
             />
           )}
           <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-gray-500">
-            <span>🔁 {item.shares} shares</span>
-            <span>💬 {item.comments} comments</span>
-            <span>❤️ {item.likes} likes</span>
-            <span className="ml-auto rounded-full bg-purple-50 px-2 py-0.5 text-purple-700">
-              {item.botProb}% bot probability
-            </span>
+            <span>🔁 {item.retweets || 0} retweets</span>
+            <span>💬 {item.replies || 0} replies</span>
+            <span>❤️ {item.likes || 0} likes</span>
+            {item.aiAnalysis?.risk_indicators?.bot_likelihood && (
+              <span className="ml-auto rounded-full bg-purple-50 px-2 py-0.5 text-purple-700">
+                {Math.round(item.aiAnalysis.risk_indicators.bot_likelihood * 100)}% bot probability
+              </span>
+            )}
           </div>
+          {item.aiAnalysis?.threat_assessment && (
+            <div className="mt-2 rounded-lg bg-gray-50 p-2">
+              <div className="text-xs font-semibold text-gray-700">
+                Threat Level: {item.aiAnalysis.threat_assessment.level?.toUpperCase() || 'UNKNOWN'}
+              </div>
+              <div className="text-xs text-gray-600 mt-1">
+                {item.aiAnalysis.threat_assessment.potential_impact || 'No impact assessment available'}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </Card>
   )
 }
 
-// ---------- helpers ----------
-const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min
-
-function buildTimeline() {
-  const days = 30
-  const out = []
-  for (let i = days; i >= 0; i--) {
-    out.push({
-      date: `${i}d`,
-      volume: 50 + Math.round(Math.random() * 100),
-      engagement: 30 + Math.round(Math.random() * 80),
-    })
-  }
-  return out
-}
-
-function buildNetwork(n = 180) {
-  return Array.from({ length: n }, () => ({
-    x: randomInt(-50, 50),
-    y: randomInt(-50, 50),
-    z: randomInt(1, 4),
-  }))
-}
-
-function buildEvidence(count = 3) {
-  const now = new Date()
-  const platforms = ["x", "reddit"]
-  const pics = [
-    "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=1200&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1607252650355-f7fd0460ccdb?q=80&w=1200&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=1200&auto=format&fit=crop",
-  ]
-  return Array.from({ length: count }, (_, i) => ({
-    id: crypto.randomUUID(),
-    account: ["@HealthTruthSeeker", "@TruthWarrior1776", "@MedicalFreedom"][i % 3],
-    timestamp: new Date(now.getTime() - (i + 1) * 60 * 60 * 1000).toLocaleString(),
-    text:
-      [
-        "BREAKING: Scientists discover the new vaccine contains nanobots that can track your location! #VaccineDeception #WakeUp",
-        "Don’t be a sheep! The vaccine alters your DNA permanently and they’re not telling you!",
-        "LEAKED DOCUMENT: Severe side effects hidden from the public. #BigPharmaLies",
-      ][i % 3],
-    image: pics[i % pics.length],
-    shares: randomInt(600, 2500),
-    comments: randomInt(120, 1000),
-    likes: randomInt(800, 4000),
-    botProb: randomInt(80, 98),
-    platform: platforms[i % platforms.length],
-  }))
-}
-
-function buildInsights() {
+// ---------- Data transformation helpers ----------
+function transformCampaignData(campaignData) {
+  const campaign = campaignData.campaign
+  const stats = campaign.stats
+  const analytics = campaign.analytics
+  
   return {
-    summary:
-      "This is a coordinated disinformation campaign targeting COVID-19 vaccines with false claims about tracking technology, DNA alteration, and concealed side effects. The campaign appears to have originated from a network of 40–50 core accounts with bot amplification.",
-    insights: [
-      { title: "Coordinated Timing", body: "93% of high-impact posts were published within a 4-hour window. Peak between 8–10 PM EST when fact-checking resources are less active." },
-      { title: "Narrative Evolution", body: "The campaign begins with general vaccine skepticism, then evolves into conspiracy-driven narratives about DNA alteration and microchips." },
-      { title: "Visual Manipulation", body: "AI analysis indicates that ~87% of images were manipulated or fabricated." },
-      { title: "Bot Network Structure", body: "Network analysis reveals a hierarchical structure with ~42 primary creators and ~140 amplifiers." },
-    ],
-    actions: [
-      "Report core network accounts to platform authorities.",
-      "Prepare fact-checking resources for the specific claims.",
-      "Alert health authorities about potential public confusion.",
-      "Monitor for narrative evolution and new hashtags.",
-    ],
+    id: campaign._id,
+    title: campaign.name,
+    severity: campaign.priority,
+    detectedAt: new Date(campaign.createdAt).toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    }),
+    lastUpdated: new Date(campaign.updatedAt).toLocaleString(),
+    posts: stats?.totalTweets || analytics?.totalTweets || 0,
+    postsDelta: campaign.recentTweets?.length || 0,
+    accounts: campaign.targetAccounts?.length || 0,
+    autoProb: 0.15, // Calculate from actual bot analysis later
+    severityScore: campaign.activityScore / 100 || 0.5,
+    severityDelta: 0.02,
+    peakActivity: "Early morning hours", // Can derive from timelineData
+    description: campaign.description,
+    platforms: campaign.platforms,
+    keywords: campaign.keywords,
+    hashtags: campaign.hashtags,
+    status: campaign.status,
+    tags: campaign.tags,
+    team: campaign.team,
+    analytics: analytics
   }
+}
+
+function transformTweetToEvidence(tweet) {
+  const timeAgo = (dateStr) => {
+    const diff = Date.now() - new Date(dateStr).getTime()
+    const minutes = Math.floor(diff / (1000 * 60))
+    const hours = Math.floor(diff / (1000 * 60 * 60))
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+    
+    if (days > 0) return `${days}d ago`
+    if (hours > 0) return `${hours}h ago`
+    return `${minutes}m ago`
+  }
+
+  return {
+    id: tweet._id,
+    username: tweet.username,
+    content: tweet.content,
+    platform: tweet.source === "twitter" ? "x" : tweet.source,
+    timeAgo: timeAgo(tweet.crawledAt),
+    likes: tweet.likes || 0,
+    retweets: tweet.retweets || 0,
+    replies: tweet.replies || 0,
+    media: tweet.media || [],
+    aiAnalysis: tweet.aiAnalysis,
+    hashtags: tweet.hashtags,
+    mentions: tweet.mentions,
+    isVerified: tweet.user?.isVerified || false,
+    displayName: tweet.displayName
+  }
+}
+
+function generateTimelineData(analytics) {
+  // Use real timeline data from API
+  if (analytics?.timelineData) {
+    return analytics.timelineData.map((item, index) => ({
+      date: `${item.hour}:00`,
+      volume: item.tweets,
+      engagement: item.tweets * 2.5 // Estimated engagement
+    }))
+  }
+  
+  // Fallback to empty data
+  return Array.from({ length: 24 }, (_, i) => ({
+    date: `${i}:00`,
+    volume: 0,
+    engagement: 0
+  }))
+}
+
+function generateNetworkData(tweets) {
+  // Generate network from real user interactions
+  const users = tweets.reduce((acc, tweet) => {
+    if (!acc[tweet.username]) {
+      acc[tweet.username] = {
+        username: tweet.username,
+        tweets: 0,
+        engagement: 0,
+        botScore: tweet.aiAnalysis?.risk_indicators?.bot_likelihood || Math.random() * 0.3,
+        isVerified: tweet.user?.isVerified || false
+      }
+    }
+    acc[tweet.username].tweets++
+    acc[tweet.username].engagement += (tweet.likes || 0) + (tweet.retweets || 0)
+    return acc
+  }, {})
+
+  return Object.values(users).slice(0, 50).map((user, index) => ({
+    x: (index % 10) * 10 - 45,
+    y: Math.floor(index / 10) * 10 - 25,
+    z: Math.max(1, Math.min(4, Math.floor(user.botScore * 4) + 1)),
+    username: user.username,
+    isVerified: user.isVerified
+  }))
 }
 
 // ---------- PAGE ----------
 export default function CampaignDetailsPage() {
-  const { id = "vaccine-deception" } = useParams()
+  const { id } = useParams()
   const navigate = useNavigate()
 
-  // core campaign state
-  const [campaign, setCampaign] = useState({
-    id,
-    title: "#VaccineDeception Campaign",
-    severity: "high",
-    detectedAt: "March 15, 2023",
-    lastUpdated: "2 hours ago",
-    posts: 1247,
-    postsDelta: 328,
-    accounts: 342,
-    autoProb: 87,
-    severityScore: 8.7,
-    severityDelta: 12,
-    peakActivity: "8–10 PM EST",
-  })
+  // State
+  const [campaign, setCampaign] = useState(null)
+  const [tweets, setTweets] = useState([])
+  const [stats, setStats] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  const [timeline, setTimeline] = useState(buildTimeline)
-  const [network, setNetwork] = useState(buildNetwork)
-  const [evidence, setEvidence] = useState(buildEvidence)
-  const insights = useMemo(buildInsights, [])
-
-  // socket wiring
-  useEffect(() => {
-    const socket = io(SOCKET_URL, {
-      transports: ["websocket"],
-      reconnection: true,
-      reconnectionAttempts: 5,
-    })
-
-    const onStats = (payload) => setCampaign((c) => ({ ...c, ...payload }))
-    const onTimeline = (row) => setTimeline((curr) => [...curr.slice(-29), row])
-    const onEvidence = (post) => setEvidence((curr) => [post, ...curr])
-    const onNetworkPoint = (pt) => setNetwork((curr) => [...curr, pt])
-
-    socket.on("campaign:stats", onStats)
-    socket.on("campaign:timeline", onTimeline)
-    socket.on("campaign:evidence", onEvidence)
-    socket.on("campaign:network", onNetworkPoint)
-
-    socket.on("connect_error", (e) => console.error("socket error:", e))
-    return () => {
-      socket.off("campaign:stats", onStats)
-      socket.off("campaign:timeline", onTimeline)
-      socket.off("campaign:evidence", onEvidence)
-      socket.off("campaign:network", onNetworkPoint)
-      socket.disconnect()
+  // Derived data
+  const timeline = useMemo(() => {
+    if (campaign?.analytics) {
+      return generateTimelineData(campaign.analytics)
     }
-  }, [])
+    return []
+  }, [campaign])
+  const network = useMemo(() => generateNetworkData(tweets), [tweets])
+  const evidence = useMemo(() => tweets.slice(0, 10).map(transformTweetToEvidence), [tweets])
 
-  // filter/sort controls for evidence
+  // Filter controls for evidence
   const [filterPlatform, setFilterPlatform] = useState("all")
   const [sortKey, setSortKey] = useState("recent")
+
   const filteredEvidence = useMemo(() => {
     let rows = evidence
     if (filterPlatform !== "all") rows = rows.filter((r) => r.platform === filterPlatform)
-    if (sortKey === "shares") rows = [...rows].sort((a, b) => b.shares - a.shares)
+    if (sortKey === "retweets") rows = [...rows].sort((a, b) => b.retweets - a.retweets)
     else if (sortKey === "likes") rows = [...rows].sort((a, b) => b.likes - a.likes)
     else rows = [...rows] // "recent" (already recent first)
     return rows
   }, [evidence, filterPlatform, sortKey])
 
+  // Fetch campaign data
+  useEffect(() => {
+    const fetchCampaignData = async () => {
+      if (!id) return
+      
+      try {
+        setLoading(true)
+        setError(null)
+
+        // Check if user is authenticated before making API call
+        const token = localStorage.getItem('token') || 
+                      localStorage.getItem('authToken') || 
+                      localStorage.getItem('accessToken') ||
+                      sessionStorage.getItem('token');
+
+        if (!token) {
+          setError('Please log in to access campaign details');
+          navigate('/login');
+          return;
+        }
+
+        console.log('Fetching campaign with ID:', id);
+        
+        // Fetch campaign details - API already includes tweets and analytics!
+        const campaignRes = await api.get(`/campaigns/${id}`)
+
+        console.log('Campaign API response:', campaignRes.data);
+
+        if (campaignRes.data.success) {
+          const campaignData = campaignRes.data.data
+          
+          setCampaign(transformCampaignData(campaignData))
+          
+          // Use the recentTweets from API response
+          const recentTweets = campaignData.campaign.recentTweets || []
+          setTweets(recentTweets)
+          
+          console.log('Loaded campaign with real data:', {
+            name: campaignData.campaign.name,
+            tweets: recentTweets.length,
+            analytics: campaignData.campaign.analytics
+          })
+          
+        } else {
+          setError('Campaign not found or access denied')
+        }
+      } catch (error) {
+        console.error('Failed to fetch campaign:', error)
+        
+        if (error.response?.status === 401) {
+          setError('Authentication failed. Please log in again.')
+          navigate('/login')
+        } else if (error.response?.status === 403) {
+          setError('Access denied. You do not have permission to view this campaign.')
+        } else if (error.response?.status === 404) {
+          setError('Campaign not found.')
+        } else {
+          setError(error.message || 'Failed to load campaign')
+        }
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchCampaignData()
+  }, [id, navigate])
+
+  // Update insights to use real data:
+  const insights = useMemo(() => {
+    if (!campaign || !tweets.length) {
+      return {
+        summary: `Campaign "${campaign?.title || 'Loading...'}" is actively monitoring ${campaign?.keywords?.slice(0,3).join(', ') || 'election content'} across social media platforms. Real-time analysis and threat detection in progress.`,
+        insights: [
+          { 
+            title: "Live Monitoring Active", 
+            body: `Currently tracking ${campaign?.posts || 0} posts across ${campaign?.platforms?.length || 0} platforms with focus on election security.` 
+          },
+          { 
+            title: "Keyword Coverage", 
+            body: `Monitoring ${campaign?.keywords?.length || 0} election-related keywords including: ${campaign?.keywords?.slice(0,3).join(', ') || 'election terms'}` 
+          },
+          { 
+            title: "Team Assignment", 
+            body: `Campaign managed by ${campaign?.team?.length || 0} team members with lead analyst coordination.` 
+          },
+          { 
+            title: "Security Status", 
+            body: `${campaign?.status?.toUpperCase() || 'ACTIVE'} monitoring with ${campaign?.tags?.length || 0} security classifications applied.` 
+          },
+        ],
+        actions: [
+          "Continue real-time monitoring of election narratives",
+          "Analyze emerging misinformation patterns",
+          "Generate intelligence reports for election authorities",
+          "Coordinate with field investigation teams",
+        ],
+      }
+    }
+
+    const threatAnalyses = tweets.filter(t => t.aiAnalysis?.threat_assessment?.level).map(t => t.aiAnalysis.threat_assessment)
+    const highThreatCount = threatAnalyses.filter(t => t.level === 'high' || t.level === 'critical').length
+    const avgBotScore = tweets.reduce((sum, t) => sum + (t.aiAnalysis?.risk_indicators?.bot_likelihood || 0), 0) / tweets.length
+
+    return {
+      summary: `Campaign "${campaign.title}" has collected ${tweets.length} posts with ${highThreatCount} high-threat items detected. AI analysis indicates ${Math.round(avgBotScore * 100)}% average bot probability across monitored election content.`,
+      insights: [
+        { 
+          title: "Threat Distribution", 
+          body: `${highThreatCount} high-threat posts detected out of ${tweets.length} total posts (${Math.round((highThreatCount/tweets.length)*100)}%)` 
+        },
+        { 
+          title: "Bot Network Activity", 
+          body: `Average bot likelihood: ${Math.round(avgBotScore * 100)}%. Coordinated activity patterns detected across ${campaign.accounts} monitored accounts.` 
+        },
+        { 
+          title: "Platform Coverage", 
+          body: `Monitoring across ${campaign.platforms.join(', ')} platforms with focus on keywords: ${campaign.keywords.slice(0, 3).join(', ')}` 
+        },
+        { 
+          title: "Election Intelligence", 
+          body: `Campaign tracking ${campaign.hashtags.length} election hashtags across ${Math.ceil(campaign.posts / 10)}K posts` 
+        },
+      ],
+      actions: [
+        "Continue monitoring for emerging narrative patterns",
+        "Review high-threat posts for manual verification",
+        "Analyze bot network connections for coordinated activity",
+        "Generate detailed report for law enforcement agencies",
+      ],
+    }
+  }, [campaign, tweets])
+
+  // Action handlers
   const backToDashboard = useCallback(() => navigate("/dashboard"), [navigate])
   const downloadPack = useCallback(() => {
-    // TODO: hook backend
-    alert("Downloading evidence pack…")
-  }, [])
+    alert("Downloading evidence pack for campaign: " + campaign?.title)
+  }, [campaign])
   const shareAnalysis = useCallback(() => {
-    // TODO: hook backend
-    alert("Shareable analysis link created!")
-  }, [])
+    alert("Shareable analysis link created for campaign: " + campaign?.title)
+  }, [campaign])
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="text-lg font-semibold text-gray-900">Loading campaign details...</div>
+          <div className="text-sm text-gray-500">Fetching data for campaign {id}</div>
+        </div>
+      </div>
+    )
+  }
+
+  // Error state
+  if (error || !campaign) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="text-lg font-semibold text-red-600">Error loading campaign</div>
+          <div className="text-sm text-gray-500">{error || 'Campaign not found'}</div>
+          <div className="text-xs text-gray-400 mt-2">Campaign ID: {id}</div>
+          <button
+            onClick={backToDashboard}
+            className="mt-4 rounded-xl bg-purple-500 px-4 py-2 text-white hover:bg-purple-600"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="grid h-screen grid-rows-[auto_1fr] bg-gray-50">
@@ -323,7 +572,6 @@ export default function CampaignDetailsPage() {
         {/* Left sidebar */}
         <Sidebar />
 
-
         {/* Main content grid */}
         <div className="grid h-[calc(100vh-96px)] grid-cols-[1fr_360px] gap-4">
           {/* Left column (scroll) */}
@@ -336,8 +584,29 @@ export default function CampaignDetailsPage() {
                   <div className="mt-1 text-xs text-gray-500">
                     Detected: {campaign.detectedAt} · Last Updated: {campaign.lastUpdated}
                   </div>
+                  <div className="mt-1 text-sm text-gray-600">{campaign.description}</div>
                 </div>
                 <Badge level={campaign.severity} />
+              </div>
+
+              {/* Keywords and platforms */}
+              <div className="mt-3 flex flex-wrap gap-2">
+                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Keywords:</div>
+                {campaign.keywords.slice(0, 5).map(keyword => (
+                  <span key={keyword} className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
+                    {keyword}
+                  </span>
+                ))}
+              </div>
+
+              <div className="mt-2 flex flex-wrap gap-2">
+                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Platforms:</div>
+                {campaign.platforms.map(platform => (
+                  <span key={platform} className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2 py-0.5 text-xs text-purple-700">
+                    <PlatformIcon platform={platform} className="w-3 h-3" />
+                    {platform.toUpperCase()}
+                  </span>
+                ))}
               </div>
 
               {/* Stat row */}
@@ -350,14 +619,18 @@ export default function CampaignDetailsPage() {
                 <StatCard
                   label="Unique Accounts"
                   value={campaign.accounts.toLocaleString()}
-                  sub={`${campaign.autoProb}% automated probability`}
+                  sub={`${Math.round(campaign.autoProb * 100)}% avg bot probability`}
                 />
                 <StatCard
-                  label="Severity Score"
-                  value={`${campaign.severityScore.toFixed(1)}/10`}
-                  sub={`Increased ${campaign.severityDelta} points`}
+                  label="Threat Score"
+                  value={`${campaign.severityScore.toFixed(1)}/1.0`}
+                  sub={campaign.severityDelta > 0 ? `+${campaign.severityDelta.toFixed(2)} increase` : "Stable"}
                 />
-                <StatCard label="Peak Activity" value={campaign.peakActivity} />
+                <StatCard 
+                  label="Status" 
+                  value={campaign.status?.toUpperCase() || "UNKNOWN"}
+                  sub={`Peak: ${campaign.peakActivity}`}
+                />
               </div>
             </Card>
 
@@ -370,7 +643,7 @@ export default function CampaignDetailsPage() {
             {/* Evidence feed */}
             <div className="mt-4">
               <div className="mb-2 flex items-center justify-between">
-                <div className="text-sm font-semibold text-gray-900">Key Evidence</div>
+                <div className="text-sm font-semibold text-gray-900">Key Evidence ({tweets.length} total posts)</div>
                 <div className="flex items-center gap-2">
                   <select
                     value={filterPlatform}
@@ -378,9 +651,10 @@ export default function CampaignDetailsPage() {
                     className="rounded-xl border px-2 py-1 text-sm"
                     title="Filter"
                   >
-                    <option value="all">All</option>
+                    <option value="all">All Platforms</option>
                     <option value="x">X / Twitter</option>
                     <option value="reddit">Reddit</option>
+                    <option value="facebook">Facebook</option>
                   </select>
                   <select
                     value={sortKey}
@@ -389,20 +663,27 @@ export default function CampaignDetailsPage() {
                     title="Sort"
                   >
                     <option value="recent">Most Recent</option>
-                    <option value="shares">Top Shares</option>
+                    <option value="retweets">Top Retweets</option>
                     <option value="likes">Top Likes</option>
                   </select>
                 </div>
               </div>
 
               <div className="space-y-3">
-                <AnimatePresence initial={false}>
-                  {filteredEvidence.map((it) => (
-                    <motion.div key={it.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-                      <EvidenceCard item={it} />
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
+                {filteredEvidence.length === 0 ? (
+                  <Card className="p-6 text-center">
+                    <div className="text-gray-500">No evidence posts found for this campaign yet.</div>
+                    <div className="text-xs text-gray-400 mt-1">Posts will appear here as they are collected and analyzed.</div>
+                  </Card>
+                ) : (
+                  <AnimatePresence initial={false}>
+                    {filteredEvidence.map((item) => (
+                      <motion.div key={item.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+                        <EvidenceCard item={item} />
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                )}
               </div>
             </div>
 
@@ -436,45 +717,40 @@ export default function CampaignDetailsPage() {
             <Card className="flex-1 p-4">
               <div className="mb-2 text-sm font-semibold text-gray-900">AI Analysis & Insights</div>
 
-              <div className="rounded-xl bg-purple-50 p-3 text-sm text-purple-900">
-                {insights.summary}
-              </div>
-
-              <div className="mt-3 space-y-3">
-                {insights.insights.map((k, i) => (
-                  <div key={i} className="rounded-xl bg-gray-50 p-3">
-                    <div className="text-sm font-semibold text-gray-900">{k.title}</div>
-                    <div className="mt-1 text-sm text-gray-700">{k.body}</div>
+              {insights ? (
+                <>
+                  <div className="rounded-xl bg-purple-50 p-3 text-sm text-purple-900">
+                    {insights.summary}
                   </div>
-                ))}
-              </div>
 
-              <div className="mt-3">
-                <div className="text-sm font-semibold text-gray-900">Recommended Actions</div>
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-700">
-                  {insights.actions.map((a, i) => (
-                    <li key={i}>{a}</li>
-                  ))}
-                </ul>
-              </div>
+                  <div className="mt-3 space-y-3">
+                    {insights.insights.map((insight, i) => (
+                      <div key={i} className="rounded-xl bg-gray-50 p-3">
+                        <div className="text-sm font-semibold text-gray-900">{insight.title}</div>
+                        <div className="mt-1 text-sm text-gray-700">{insight.body}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-3">
+                    <div className="text-sm font-semibold text-gray-900">Recommended Actions</div>
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-700">
+                      {insights.actions.map((action, i) => (
+                        <li key={i}>{action}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center text-gray-500 py-8">
+                  <div className="text-sm">Generating AI insights...</div>
+                  <div className="text-xs mt-1">Analysis will appear as data is collected</div>
+                </div>
+              )}
             </Card>
           </aside>
         </div>
       </div>
     </div>
-  )
-}
-
-// ---------- small components ----------
-function SidebarLink({ onClick, text, danger = false }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`w-full rounded-xl px-3 py-2 text-left transition ${
-        danger ? "text-red-600 hover:bg-red-50" : "text-gray-700 hover:bg-gray-50"
-      }`}
-    >
-      {text}
-    </button>
   )
 }

@@ -1,11 +1,54 @@
+/* eslint-disable no-prototype-builtins */
+/* eslint-disable no-unused-vars */
 // src/pages/CampaignsArchivePage.jsx
 import { useMemo, useState, useCallback, useEffect } from "react"
-// eslint-disable-next-line no-unused-vars
+ 
 import { motion, AnimatePresence } from "framer-motion"
 import { useNavigate } from "react-router-dom"
 import Sidebar from "@/components/ui/Sidebar"
 import AccountButton from "@/components/AccountButton"
+import axios from "axios"
 
+// ---- API Configuration ----
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api"
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 10000,
+});
+
+api.interceptors.request.use(
+  (config) => {
+    // Try multiple token storage keys
+    const token = localStorage.getItem('token') || 
+                  localStorage.getItem('authToken') || 
+                  localStorage.getItem('accessToken') ||
+                  sessionStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Add response interceptor
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Clear tokens and redirect to login
+      localStorage.removeItem('token');
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('accessToken');
+      sessionStorage.removeItem('token');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
 
 // ---- Inline platform icons (avoid lucide brand exports)
 const XIcon = (p) => (
@@ -49,6 +92,7 @@ const severityStyles = {
   medium: "text-orange-500",
   low: "text-green-600",
 }
+
 const SeverityBadge = ({ level }) => {
   const l = (level || "low").toLowerCase()
   return (
@@ -59,62 +103,158 @@ const SeverityBadge = ({ level }) => {
   )
 }
 
-// const SidebarLink = ({ text, onClick, danger }) => (
-//   <button
-//     onClick={onClick}
-//     className={`w-full rounded-xl px-3 py-2 text-left text-sm transition ${danger ? "text-red-600 hover:bg-red-50" : "text-gray-700 hover:bg-gray-50"}`}
-//   >
-//     {text}
-//   </button>
-// )
+// ---- Transform API campaign data to UI format ----
+function transformCampaign(campaign) {
+  return {
+    id: campaign._id,
+    title: campaign.name,
+    subtitle: campaign.description || "No description available",
+    severity: campaign.priority || "medium",
+    detected: new Date(campaign.createdAt).toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    }),
+    platforms: campaign.platforms || ["x"],
+    status: getStatusDisplay(campaign.status),
+    recency: Math.floor((Date.now() - new Date(campaign.createdAt).getTime()) / (1000 * 60 * 60 * 24)), // days ago
+    category: campaign.category,
+    tags: campaign.tags || [],
+    rawStatus: campaign.status,
+    activityScore: campaign.activityScore || 0,
+    totalTweets: campaign.stats?.totalTweets || 0,
+    lastCrawled: campaign.stats?.lastCrawled
+  }
+}
+
+// ---- Status display mapping ----
+function getStatusDisplay(status) {
+  switch (status) {
+    case "active": return "Active";
+    case "paused": return "Paused";
+    case "archived": return "Archived";
+    case "completed": return "Completed";
+    default: return "Unknown";
+  }
+}
+
+// ---- Time helper ----
+function timeAgo(dateStr) {
+  if (!dateStr) return "Unknown"
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+  if (days === 0) return "Today"
+  if (days === 1) return "Yesterday"
+  if (days < 7) return `${days} days ago`
+  if (days < 30) return `${Math.floor(days / 7)} weeks ago`
+  if (days < 365) return `${Math.floor(days / 30)} months ago`
+  return `${Math.floor(days / 365)} years ago`
+}
 
 export default function CampaignsArchivePage() {
   const navigate = useNavigate()
 
-  // ---- filters state
-  const [timeRange, setTimeRange] = useState("30") // 30/90/180/custom
-  const [severity, setSeverity] = useState({ critical: false, high: true, medium: true, low: true })
-  const [platforms, setPlatforms] = useState({ x: true, facebook: true, telegram: false, reddit: true, tiktok: false })
-  const [tags, setTags] = useState(["Misinformation", "Health"])
+  // ---- filters state ----
+  const [timeRange, setTimeRange] = useState("90") // Show more campaigns by default
+  const [severity, setSeverity] = useState({ critical: true, high: true, medium: true, low: true })
+  const [platforms, setPlatforms] = useState({ x: true, facebook: true, telegram: true, reddit: true, tiktok: true })
+  const [status, setStatus] = useState({ active: true, paused: true, archived: false, completed: false }) // ✅ Include paused
+  const [tags, setTags] = useState([])
   const [newTag, setNewTag] = useState("")
   const [query, setQuery] = useState("")
 
-  // ---- data (stubbed; replace with API)
-  const [rows, setRows] = useState(() => seedData())
+  // ---- data state ----
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [totalRows, setTotalRows] = useState(0)
+  const [error, setError] = useState(null)
 
-  // simulated fetch on filter apply
-  const applyFilters = useCallback(() => {
-    // In prod: call API with { timeRange, severity, platforms, tags, query, page }
-    // Here: filter locally
-    const filtered = seedData()
-      .filter(r => {
-        const sevOK =
-          (severity.critical && r.severity==="critical") ||
-          (severity.high && r.severity==="high") ||
-          (severity.medium && r.severity==="medium") ||
-          (severity.low && r.severity==="low")
-        const platOK = Object.entries(platforms).some(([k, v]) => v && r.platforms.includes(k))
-        const qOK = query ? (r.title.toLowerCase().includes(query.toLowerCase()) || r.subtitle.toLowerCase().includes(query.toLowerCase())) : true
-        // naive time filter: newer dates for shorter ranges
-        const dayWeight = timeRange==="30" ? 30 : timeRange==="90" ? 90 : 180
-        const recencyOK = r.recency <= dayWeight
-        return sevOK && platOK && qOK && recencyOK
+  // ---- pagination ----
+  const [page, setPage] = useState(1)
+  const pageSize = 10 // Increased to show more campaigns
+
+  // ---- Fetch campaigns from API ----
+  const fetchCampaigns = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      
+      // Build query parameters - include both active and paused
+      const activeStatuses = Object.keys(status).filter(k => status[k])
+      const activeSeverities = Object.keys(severity).filter(k => severity[k])
+      const activePlatforms = Object.keys(platforms).filter(k => platforms[k])
+
+      const params = {
+        page,
+        limit: pageSize,
+        search: query || undefined,
+        status: activeStatuses.length > 0 ? activeStatuses.join(',') : 'active,paused', // ✅ Default to both
+        priority: activeSeverities.length > 0 ? activeSeverities.join(',') : undefined,
+        platforms: activePlatforms.length > 0 ? activePlatforms.join(',') : undefined,
+        timeRange: timeRange !== "custom" ? timeRange : undefined,
+      }
+
+      // Remove undefined params
+      Object.keys(params).forEach(key => {
+        if (params[key] === undefined || params[key] === '') {
+          delete params[key]
+        }
       })
+
+      console.log('Fetching campaigns with params:', params)
+
+      const response = await api.get('/campaigns', { params })
+      
+      console.log('API Response:', response.data)
+
+      if (response.data.success) {
+        const campaignsData = response.data.data.campaigns || response.data.data || []
+        const transformedCampaigns = campaignsData.map(transformCampaign)
+        
+        setRows(transformedCampaigns)
+        setTotalRows(response.data.data.pagination?.total || campaignsData.length)
+        
+        console.log('Transformed campaigns:', transformedCampaigns)
+      } else {
+        console.error('API returned error:', response.data)
+        setError('Failed to load campaigns')
+        setRows([])
+        setTotalRows(0)
+      }
+    } catch (error) {
+      console.error('Failed to fetch campaigns:', error)
+      setError(error.message || 'Failed to load campaigns')
+      setRows([])
+      setTotalRows(0)
+    } finally {
+      setLoading(false)
+    }
+  }, [page, query, severity, platforms, status, timeRange])
+
+  // ---- Apply filters ----
+  const applyFilters = useCallback(() => {
     setPage(1)
-    setRows(filtered)
-  }, [timeRange, severity, platforms, query])
+    fetchCampaigns()
+  }, [fetchCampaigns])
 
   const resetFilters = useCallback(() => {
-    setTimeRange("30")
-    setSeverity({ critical: false, high: true, medium: true, low: true })
-    setPlatforms({ x: true, facebook: true, telegram: false, reddit: true, tiktok: false })
-    setTags(["Misinformation", "Health"])
+    setTimeRange("90")
+    setSeverity({ critical: true, high: true, medium: true, low: true })
+    setPlatforms({ x: true, facebook: true, telegram: true, reddit: true, tiktok: true })
+    setStatus({ active: true, paused: true, archived: false, completed: false })
+    setTags([])
     setNewTag("")
     setQuery("")
-    setRows(seedData())
     setPage(1)
   }, [])
 
+  // ---- Initial fetch ----
+  useEffect(() => {
+    fetchCampaigns()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]) // Fetch when page changes
+
+  // ---- Tag management ----
   const addTag = useCallback(() => {
     const t = newTag.trim()
     if (t && !tags.includes(t)) setTags(prev => [...prev, t])
@@ -123,23 +263,29 @@ export default function CampaignsArchivePage() {
 
   const removeTag = useCallback((t) => setTags(prev => prev.filter(x => x !== t)), [])
 
-  // ---- pagination
-  const [page, setPage] = useState(1)
-  const pageSize = 5
-  const total = rows.length
-  const totalPages = Math.max(1, Math.ceil(total / pageSize))
-  const visible = useMemo(() => rows.slice((page-1)*pageSize, page*pageSize), [rows, page])
+  // ---- Pagination calculations ----
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
+  const visible = rows // API already returns paginated results
 
-  // ---- top header counts
-  const shownText = `Showing ${visible.length ? ((page-1)*pageSize+1) : 0}-${Math.min(page*pageSize, total)} campaigns`
-  const filteredFrom = ` (Filtered from ${seedData().length})`
+  // ---- Header counts ----
+  const shownText = loading 
+    ? "Loading campaigns..."
+    : `Showing ${visible.length ? ((page-1)*pageSize+1) : 0}-${Math.min(page*pageSize, totalRows)} of ${totalRows} campaigns`
 
-  // ---- helpers to toggle checkboxes
+  // ---- helpers to toggle checkboxes ----
   const toggle = (setter, key) => setter(prev => ({ ...prev, [key]: !prev[key] }))
 
-  useEffect(() => {
-    // whenever tag list changes, you might re-query — here we keep it manual via Apply
-  }, [tags])
+  // ---- Status counts for display ----
+  const statusCounts = useMemo(() => {
+    const counts = { active: 0, paused: 0, archived: 0, completed: 0 }
+    rows.forEach(campaign => {
+      const status = campaign.rawStatus || 'unknown'
+      if (counts.hasOwnProperty(status)) {
+        counts[status]++
+      }
+    })
+    return counts
+  }, [rows])
 
   return (
     <div className="grid h-screen grid-rows-[auto_1fr] bg-gray-50">
@@ -150,6 +296,7 @@ export default function CampaignsArchivePage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && applyFilters()}
             placeholder="Search campaigns, alerts, or evidence…"
             className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:ring-4 focus:ring-purple-200"
           />
@@ -162,13 +309,6 @@ export default function CampaignsArchivePage() {
             Ask AI
           </button>
           <AccountButton />
-          <button
-            onClick={() => navigate("/login")}
-            className="rounded-xl border px-3 py-2 hover:bg-gray-50"
-            title="Logout"
-          >
-            Logout
-          </button>
         </div>
       </header>
 
@@ -176,17 +316,19 @@ export default function CampaignsArchivePage() {
       <div className="row-start-2 grid grid-cols-[auto_1fr] gap-4 p-4">
         {/* Left sidebar nav */}
         <Sidebar/>
+        
         {/* Main content grid */}
         <div className="grid h-[calc(100vh-96px)] grid-cols-[300px_1fr] gap-4">
           {/* Filters panel */}
           <section className="min-h-0 overflow-auto rounded-2xl border bg-white p-4">
-            <div className="text-sm font-semibold text-gray-900">Filter Campaigns</div>
+            <div className="text-sm font-semibold text-gray-900 mb-4">Filter Campaigns</div>
 
             <FilterGroup title="Time Range">
               {[
                 { id: "30", label: "Last 30 days" },
                 { id: "90", label: "Last 90 days" },
                 { id: "180", label: "Last 180 days" },
+                { id: "365", label: "Last year" },
                 { id: "custom", label: "Custom range" },
               ].map(opt => (
                 <label key={opt.id} className="flex cursor-pointer items-center gap-2 text-sm">
@@ -201,7 +343,26 @@ export default function CampaignsArchivePage() {
               ))}
             </FilterGroup>
 
-            <FilterGroup title="Severity">
+            <FilterGroup title="Campaign Status">
+              {[
+                { id: "active", label: "Active", count: statusCounts.active },
+                { id: "paused", label: "Paused", count: statusCounts.paused },
+                { id: "archived", label: "Archived", count: statusCounts.archived },
+                { id: "completed", label: "Completed", count: statusCounts.completed },
+              ].map(s => (
+                <label key={s.id} className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={!!status[s.id]}
+                    onChange={() => toggle(setStatus, s.id)}
+                  />
+                  <span className="flex-1">{s.label}</span>
+                  <span className="text-xs text-gray-500">({s.count})</span>
+                </label>
+              ))}
+            </FilterGroup>
+
+            <FilterGroup title="Priority Level">
               {["critical", "high", "medium", "low"].map(s => (
                 <label key={s} className="flex cursor-pointer items-center gap-2 text-sm">
                   <input
@@ -228,12 +389,15 @@ export default function CampaignsArchivePage() {
                     checked={!!platforms[p.id]}
                     onChange={() => toggle(setPlatforms, p.id)}
                   />
-                  {p.label}
+                  <div className="flex items-center gap-2">
+                    <PlatformIcon name={p.id} />
+                    {p.label}
+                  </div>
                 </label>
               ))}
             </FilterGroup>
 
-            <FilterGroup title="Narrative Tags">
+            <FilterGroup title="Tags">
               <div className="flex flex-wrap gap-2">
                 <AnimatePresence initial={false}>
                   {tags.map(t => (
@@ -245,7 +409,7 @@ export default function CampaignsArchivePage() {
                       className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2 py-0.5 text-xs text-purple-700"
                     >
                       {t}
-                      <button onClick={() => removeTag(t)} className="text-purple-600">×</button>
+                      <button onClick={() => removeTag(t)} className="text-purple-600 hover:text-purple-800">×</button>
                     </motion.span>
                   ))}
                 </AnimatePresence>
@@ -254,112 +418,166 @@ export default function CampaignsArchivePage() {
                 <input
                   value={newTag}
                   onChange={(e) => setNewTag(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && addTag()}
                   placeholder="Add tag..."
-                  className="flex-1 rounded-xl border px-2 py-1 text-sm"
+                  className="flex-1 rounded-xl border px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-purple-200"
                 />
-                <button onClick={addTag} className="rounded-xl border px-2 py-1 text-sm hover:bg-gray-50">+</button>
+                <button 
+                  onClick={addTag} 
+                  className="rounded-xl border px-2 py-1 text-sm hover:bg-gray-50"
+                >
+                  +
+                </button>
               </div>
             </FilterGroup>
 
-            <div className="mt-4 flex items-center gap-2">
+            <div className="mt-6 flex flex-col gap-2">
               <button
                 onClick={applyFilters}
-                className="flex-1 rounded-xl bg-purple-500 px-3 py-2 text-sm font-semibold text-white hover:bg-purple-600"
+                className="w-full rounded-xl bg-purple-500 px-3 py-2 text-sm font-semibold text-white hover:bg-purple-600 disabled:opacity-50"
+                disabled={loading}
               >
-                Apply Filters
+                {loading ? "Loading..." : "Apply Filters"}
               </button>
               <button
                 onClick={resetFilters}
-                className="flex-1 rounded-xl border px-3 py-2 text-sm hover:bg-gray-50"
+                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+                disabled={loading}
               >
-                Reset Filters
+                Reset All
               </button>
             </div>
           </section>
 
           {/* Campaigns table */}
           <section className="min-h-0 overflow-auto rounded-2xl border bg-white p-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-4">
               <div>
                 <div className="text-lg font-semibold text-gray-900">Campaigns Archive</div>
                 <div className="text-xs text-gray-500">
-                  Browse and analyze past disinformation campaigns
+                  Browse and analyze active and paused campaigns
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search campaigns..."
-                  className="rounded-xl border px-3 py-2 text-sm outline-none focus:ring-4 focus:ring-purple-200"
-                />
                 <button
-                  onClick={applyFilters}
-                  className="rounded-xl border px-3 py-2 text-sm hover:bg-gray-50"
+                  onClick={() => navigate("/campaigns/new")}
+                  className="rounded-xl bg-green-500 px-3 py-2 text-sm font-semibold text-white hover:bg-green-600"
                 >
-                  Search
+                  New Campaign
                 </button>
               </div>
             </div>
 
-            <div className="mt-3 text-xs text-gray-500">
-              {shownText}{filteredFrom}
+            <div className="text-xs text-gray-500 mb-3">
+              {shownText}
             </div>
 
-            <div className="mt-3 divide-y">
-              {visible.map((c) => (
-                <div key={c.id} className="flex items-center justify-between gap-3 py-3">
-                  {/* title + subtitle */}
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium text-gray-900">{c.title}</div>
-                    <div className="truncate text-xs text-gray-500">{c.subtitle}</div>
-                  </div>
+            {error && (
+              <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
 
-                  {/* severity */}
-                  <div className="w-28 shrink-0">
-                    <SeverityBadge level={c.severity} />
-                  </div>
-
-                  {/* detected date */}
-                  <div className="w-32 shrink-0 text-sm text-gray-700">{c.detected}</div>
-
-                  {/* platforms */}
-                  <div className="flex w-28 shrink-0 items-center gap-2 text-gray-500">
-                    {c.platforms.map((p) => (
-                      <span key={p} title={p}><PlatformIcon name={p} /></span>
-                    ))}
-                  </div>
-
-                  {/* status */}
-                  <div className={`w-28 shrink-0 text-sm ${statusColor(c.status)}`}>
-                    {c.status}
-                  </div>
-
-                  {/* action */}
-                  <div className="w-20 shrink-0 text-right">
-                    <button
-                      onClick={() => navigate(`/campaigns/${c.id}`)}
-                      className="rounded-xl bg-purple-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-purple-600"
-                    >
-                      view
-                    </button>
-                  </div>
+            <div className="divide-y">
+              {loading ? (
+                <div className="py-8 text-center text-gray-500">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto mb-2"></div>
+                  Loading campaigns...
                 </div>
-              ))}
+              ) : visible.length === 0 ? (
+                <div className="py-8 text-center text-gray-500">
+                  <div className="text-lg mb-2">No campaigns found</div>
+                  <div className="text-sm">Try adjusting your filters or search terms</div>
+                </div>
+              ) : (
+                visible.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between gap-3 py-4 hover:bg-gray-50">
+                    {/* title + subtitle */}
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-gray-900">{c.title}</div>
+                      <div className="truncate text-xs text-gray-500 mt-1">{c.subtitle}</div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <SeverityBadge level={c.severity} />
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          c.rawStatus === 'active' ? 'bg-green-100 text-green-700' :
+                          c.rawStatus === 'paused' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {c.status}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* metrics */}
+                    <div className="flex flex-col items-end text-sm text-gray-600 min-w-0">
+                      <div>Created: {c.detected}</div>
+                      <div className="text-xs text-gray-500">
+                        {c.totalTweets} posts • Activity: {c.activityScore}%
+                      </div>
+                    </div>
+
+                    {/* platforms */}
+                    <div className="flex w-20 shrink-0 items-center gap-1 text-gray-500">
+                      {c.platforms.slice(0, 3).map((p) => (
+                        <span key={p} title={p}><PlatformIcon name={p} /></span>
+                      ))}
+                      {c.platforms.length > 3 && (
+                        <span className="text-xs text-gray-400">+{c.platforms.length - 3}</span>
+                      )}
+                    </div>
+
+                    {/* action */}
+                    <div className="w-20 shrink-0 text-right">
+                      <button
+                        onClick={() => navigate(`/campaigns/${c.id}`)}
+                        className="rounded-xl bg-purple-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-purple-600 transition-colors"
+                      >
+                        View
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
 
             {/* pagination */}
-            <div className="mt-4 flex items-center justify-end gap-1">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
+            {totalPages > 1 && (
+              <div className="mt-6 flex items-center justify-center gap-1">
                 <button
-                  key={n}
-                  onClick={() => setPage(n)}
-                  className={`h-8 w-8 rounded-lg border text-sm ${n===page ? "bg-purple-500 text-white border-purple-500" : "hover:bg-gray-50"}`}
+                  onClick={() => setPage(Math.max(1, page - 1))}
+                  disabled={page <= 1 || loading}
+                  className="px-3 py-1 rounded-lg border text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {n}
+                  Previous
                 </button>
-              ))}
-            </div>
+                
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const pageNum = Math.max(1, Math.min(totalPages, page - 2 + i))
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setPage(pageNum)}
+                      disabled={loading}
+                      className={`h-8 w-8 rounded-lg text-sm transition-colors ${
+                        pageNum === page 
+                          ? "bg-purple-500 text-white border-purple-500" 
+                          : "border hover:bg-gray-50"
+                      } ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
+                    >
+                      {pageNum}
+                    </button>
+                  )
+                }).filter((_, i, arr) => arr.findIndex(el => el.key === arr[i].key) === i)}
+                
+                <button
+                  onClick={() => setPage(Math.min(totalPages, page + 1))}
+                  disabled={page >= totalPages || loading}
+                  className="px-3 py-1 rounded-lg border text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </section>
         </div>
       </div>
@@ -371,86 +589,11 @@ export default function CampaignsArchivePage() {
 
 function FilterGroup({ title, children }) {
   return (
-    <div className="mt-4">
-      <div className="mb-2 border-b pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+    <div className="mb-6">
+      <div className="mb-3 border-b pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
         {title}
       </div>
       <div className="space-y-2">{children}</div>
     </div>
   )
-}
-
-function statusColor(s) {
-  const t = (s || "").toLowerCase()
-  if (t === "resolved") return "text-green-600"
-  if (t === "monitoring") return "text-blue-600"
-  if (t === "active") return "text-red-600"
-  return "text-gray-600"
-}
-
-// Demo dataset. Replace with API results.
-function seedData() {
-  return [
-    {
-      id: "c1",
-      title: "Operation Shadow Whisper",
-      subtitle: "Election interference campaign",
-      severity: "critical",
-      detected: "Oct 12, 2023",
-      platforms: ["x", "facebook"],
-      status: "Monitoring",
-      recency: 10,
-    },
-    {
-      id: "c2",
-      title: "Pandemic Panic Network",
-      subtitle: "Health misinformation campaign",
-      severity: "high",
-      detected: "Sep 28, 2023",
-      platforms: ["facebook", "reddit"],
-      status: "Resolved",
-      recency: 40,
-    },
-    {
-      id: "c3",
-      title: "Financial Chaos Initiative",
-      subtitle: "Economic destabilization campaign",
-      severity: "medium",
-      detected: "Sep 15, 2023",
-      platforms: ["x"],
-      status: "Active",
-      recency: 55,
-    },
-    {
-      id: "c4",
-      title: "Sovereign Defense Network",
-      subtitle: "Military misinformation campaign",
-      severity: "high",
-      detected: "Aug 30, 2023",
-      platforms: ["x", "reddit"],
-      status: "Monitoring",
-      recency: 75,
-    },
-    {
-      id: "c5",
-      title: "Energy Crisis Fabrication",
-      subtitle: "Infrastructure misinformation",
-      severity: "medium",
-      detected: "Aug 17, 2023",
-      platforms: ["x", "facebook", "reddit"],
-      status: "Resolved",
-      recency: 100,
-    },
-    // add more to simulate pagination
-    ...Array.from({ length: 23 }, (_, i) => ({
-      id: `c${i + 6}`,
-      title: `Synthetic Campaign ${i + 6}`,
-      subtitle: "Auto-generated sample",
-      severity: ["low", "medium", "high"][i % 3],
-      detected: "Jul 2023",
-      platforms: ["x", "facebook", "reddit", "telegram", "tiktok"].filter((_, j) => (i + j) % 2 === 0),
-      status: ["Monitoring", "Active", "Resolved"][i % 3],
-      recency: 30 + (i % 150),
-    })),
-  ]
 }

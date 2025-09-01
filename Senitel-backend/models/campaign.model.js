@@ -158,6 +158,13 @@ const campaignSchema = new mongoose.Schema({
   archivedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
+  },
+  completedAt: {
+    type: Date
+  },
+  completedReason: {
+    type: String,
+    maxlength: 200
   }
 }, {
   timestamps: true

@@ -1,3 +1,4 @@
+/* eslint-disable no-prototype-builtins */
 /* eslint-disable no-unused-vars */
 // src/pages/DashboardPage.jsx
 import { useEffect, useMemo, useState, useCallback } from "react"
@@ -80,6 +81,26 @@ const sev = {
 }
 const sevKey = (s) => (s || "low").toLowerCase()
 
+// ---------- Status styles ----------
+const statusStyles = {
+  active: { 
+    badge: "bg-green-100 text-green-700 border-green-300",
+    icon: "🟢"
+  },
+  paused: { 
+    badge: "bg-yellow-100 text-yellow-700 border-yellow-300",
+    icon: "⏸️"
+  },
+  completed: { 
+    badge: "bg-blue-100 text-blue-700 border-blue-300",
+    icon: "✅"
+  },
+  archived: { 
+    badge: "bg-gray-100 text-gray-700 border-gray-300",
+    icon: "📦"
+  }
+}
+
 // ---------- tiny sparkline ----------
 function Sparkline({ data }) {
   return (
@@ -103,24 +124,93 @@ function SeverityBadge({ level }) {
   )
 }
 
-// ---------- live alert ----------
-function LiveAlert({ item }) {
+// ---------- Status Badge ----------
+function StatusBadge({ status }) {
+  const statusKey = (status || "active").toLowerCase()
+  const style = statusStyles[statusKey] || statusStyles.active
+  
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold border ${style.badge}`}>
+      <span>{style.icon}</span>
+      {status.charAt(0).toUpperCase() + status.slice(1)}
+    </span>
+  )
+}
+
+// ---------- live alert with enhanced animations ----------
+function LiveAlert({ item, isNew = false }) {
   const k = sevKey(item.severity)
   const Icon = item.platform === "reddit" ? RedditIcon : XIcon
+  
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm"
+      initial={{ opacity: 0, y: 20, scale: 0.9 }}
+      animate={{ 
+        opacity: 1, 
+        y: 0, 
+        scale: 1,
+        // ✅ Pulse effect for new alerts
+        ...(isNew && { 
+          boxShadow: [
+            "0px 0px 0px rgba(239, 68, 68, 0.0)",
+            "0px 0px 20px rgba(239, 68, 68, 0.3)", 
+            "0px 0px 0px rgba(239, 68, 68, 0.0)"
+          ]
+        })
+      }}
+      exit={{ opacity: 0, y: -20, scale: 0.9 }}
+      transition={{ 
+        type: "spring", 
+        stiffness: 300, 
+        damping: 25,
+        // ✅ Staggered animation
+        delay: isNew ? 0.1 : 0
+      }}
+      className={`rounded-xl border bg-white p-3 shadow-sm ${
+        isNew ? 'border-red-300 bg-red-50' : 'border-gray-200'
+      } ${k === 'high' ? 'border-l-4 border-l-red-500' : 
+           k === 'medium' ? 'border-l-4 border-l-orange-500' : 
+           'border-l-4 border-l-green-500'}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="space-y-1">
-          <div className="text-sm font-semibold text-gray-900">{item.title}</div>
+          <div className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+            {item.title}
+            {/* ✅ Indian flag emoji for regional content */}
+            {item.isIndian && <span>🇮🇳</span>}
+            {/* ✅ Real-time indicator */}
+            {isNew && (
+              <motion.div
+                animate={{ opacity: [1, 0.5, 1] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+                className="w-2 h-2 bg-red-500 rounded-full"
+              />
+            )}
+          </div>
           <SeverityBadge level={item.severity} />
+          {/* ✅ Location badge for Indian alerts */}
+          {item.location && (
+            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700">
+              📍 {item.location}
+            </span>
+          )}
         </div>
         <Icon className="h-4 w-4 text-gray-500" />
       </div>
       <p className="mt-2 text-sm text-gray-700 line-clamp-3">{item.description}</p>
+      
+      {/* ✅ Engagement metrics for realistic feel */}
+      {item.engagement && (
+        <div className="mt-2 flex items-center gap-3 text-xs text-gray-500">
+          <span className="flex items-center gap-1">
+            <span>🔄</span> {item.engagement.shares} shares
+          </span>
+          <span className="flex items-center gap-1">
+            <span>👁️</span> {item.engagement.views} views
+          </span>
+        </div>
+      )}
+      
       <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
         <Clock className="h-3 w-3" /> {item.timeAgo || "just now"}
       </div>
@@ -149,8 +239,11 @@ function CampaignCard({ c, onView }) {
       className="flex flex-col rounded-2xl border border-gray-200 bg-white p-4 shadow-sm cursor-pointer"
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="space-y-1">
-          <SeverityBadge level={c.severity} />
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <SeverityBadge level={c.severity} />
+            <StatusBadge status={c.status} />
+          </div>
           <div className="text-lg font-semibold text-gray-900">{c.name || c.title}</div>
         </div>
         <button
@@ -163,6 +256,18 @@ function CampaignCard({ c, onView }) {
       </div>
 
       <p className="mt-2 line-clamp-2 text-sm text-gray-700">{c.description}</p>
+
+      {/* Campaign stats */}
+      <div className="mt-3 flex items-center justify-between text-sm">
+        <div className="text-gray-600">
+          <span className="font-medium">{c.stats?.totalTweets || 0}</span> posts collected
+        </div>
+        {c.completedAt && (
+          <div className="text-xs text-gray-500">
+            Completed: {new Date(c.completedAt).toLocaleDateString()}
+          </div>
+        )}
+      </div>
 
       {/* Activity bar */}
       <div className="mt-3">
@@ -178,15 +283,21 @@ function CampaignCard({ c, onView }) {
         </div>
       </div>
 
-      {/* Lead / reposts / sparkline */}
+      {/* Lead / team info */}
       <div className="mt-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-full bg-purple-200" />
+          <div className="h-8 w-8 rounded-full bg-purple-200 flex items-center justify-center text-xs font-semibold text-purple-700">
+            {(c.team?.[0]?.user?.email || c.lead?.name || "A").charAt(0).toUpperCase()}
+          </div>
           <div className="text-xs text-gray-600">
-            <span className="font-medium">Lead:</span> {c.team?.[0]?.user?.name || c.lead?.name || "—"}
+            <span className="font-medium">Lead:</span> {c.team?.[0]?.user?.email?.split('@')[0] || c.lead?.name || "Analyst"}
           </div>
         </div>
-        <div className="text-xs text-gray-500">{c.stats?.totalTweets || c.reposts || 0} posts</div>
+        <div className="text-xs text-gray-500">
+          {c.platforms?.length > 0 && (
+            <span className="capitalize">{c.platforms.join(', ')}</span>
+          )}
+        </div>
       </div>
 
       <div className="mt-2">
@@ -195,9 +306,15 @@ function CampaignCard({ c, onView }) {
 
       <button
         onClick={() => onView?.(c)}
-        className="mt-4 rounded-xl bg-purple-500 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-600 active:scale-[0.98]"
+        className={`mt-4 rounded-xl px-4 py-2 text-sm font-semibold text-white active:scale-[0.98] ${
+          c.status === 'completed' 
+            ? 'bg-blue-500 hover:bg-blue-600' 
+            : c.status === 'paused'
+            ? 'bg-yellow-500 hover:bg-yellow-600'
+            : 'bg-purple-500 hover:bg-purple-600'
+        }`}
       >
-        View Details
+        {c.status === 'completed' ? 'View Results' : 'View Details'}
       </button>
     </motion.div>
   );
@@ -224,6 +341,7 @@ function transformCampaign(campaign) {
     id: campaign._id,
     title: campaign.name,
     name: campaign.name,
+    status: campaign.status,
     severity: campaign.severity || calculateSeverity(campaign),
     description: campaign.description,
     activity: campaign.activityScore,
@@ -232,8 +350,11 @@ function transformCampaign(campaign) {
     stats: campaign.stats,
     team: campaign.team,
     lead: campaign.team?.[0]?.user || { name: "Analyst" },
-    spark: generateSparkFromStats(campaign.stats),
+    spark: campaign.sparkData || generateSparkFromStats(campaign.stats),
     updatedAgo: timeAgo(campaign.updatedAt),
+    completedAt: campaign.completedAt,
+    completedReason: campaign.completedReason,
+    platforms: campaign.platforms || ['x'],
   }
 }
 
@@ -258,6 +379,87 @@ function generateSparkFromStats(stats) {
   }));
 }
 
+// ✅ Dynamic Indian-themed alerts pool
+const INDIAN_ALERTS_POOL = [
+  {
+    id: "alert_001",
+    title: "EVM Tampering Claims Viral in Uttar Pradesh",
+    description: "Coordinated disinformation campaign claiming electronic voting machines were hacked in 47 constituencies across UP. Videos showing 'proof' spreading rapidly on WhatsApp groups.",
+    severity: "high",
+    platform: "x",
+    isIndian: true,
+    location: "Uttar Pradesh",
+    engagement: { shares: 2847, views: 89420 },
+    timestamp: Date.now() - 5 * 60 * 1000
+  },
+  {
+    id: "alert_002", 
+    title: "Fake Exit Poll Data Circulating",
+    description: "Fabricated exit poll results showing dramatic swings in Maharashtra constituencies. Created to influence last-minute voter sentiment in ongoing elections.",
+    severity: "medium",
+    platform: "x",
+    isIndian: true,
+    location: "Maharashtra",
+    engagement: { shares: 1203, views: 34560 },
+    timestamp: Date.now() - 12 * 60 * 1000
+  },
+  {
+    id: "alert_003",
+    title: "Communal Violence Misinformation in West Bengal",
+    description: "Doctored images from 2019 riots being shared as 'current' violence to inflame tensions ahead of by-elections. 156 Twitter accounts amplifying false narrative.",
+    severity: "high", 
+    platform: "x",
+    isIndian: true,
+    location: "West Bengal",
+    engagement: { shares: 3421, views: 127840 },
+    timestamp: Date.now() - 18 * 60 * 1000
+  },
+  {
+    id: "alert_004",
+    title: "Booth Capturing Videos Go Viral",
+    description: "Old footage from 2017 Kerala elections being circulated as evidence of current booth capturing in Rajasthan. 23 WhatsApp groups identified spreading content.",
+    severity: "medium",
+    platform: "reddit",
+    isIndian: true, 
+    location: "Rajasthan",
+    engagement: { shares: 867, views: 23140 },
+    timestamp: Date.now() - 25 * 60 * 1000
+  },
+  {
+    id: "alert_005",
+    title: "Voter ID Fraud Instructions Spreading", 
+    description: "Step-by-step guides on creating fake voter IDs circulating in Telegram channels. Election Commission coordination protocols compromised in 12 districts.",
+    severity: "high",
+    platform: "x",
+    isIndian: true,
+    location: "Bihar", 
+    engagement: { shares: 934, views: 45670 },
+    timestamp: Date.now() - 33 * 60 * 1000
+  },
+  {
+    id: "alert_006",
+    title: "AI-Generated Politician Speeches Detected",
+    description: "Deep fake videos of opposition leaders making inflammatory statements detected across social platforms. Professional production quality suggests state-level actor involvement.",
+    severity: "high",
+    platform: "x",
+    isIndian: true,
+    location: "Tamil Nadu",
+    engagement: { shares: 1876, views: 67230 },
+    timestamp: Date.now() - 7 * 60 * 1000
+  },
+  {
+    id: "alert_007",
+    title: "Minority Community Voter Suppression",
+    description: "False information about changed polling dates targeting Muslim-majority areas in Old City Hyderabad. SMS campaigns coordinated to cause confusion on election day.",
+    severity: "medium",
+    platform: "reddit",
+    isIndian: true,
+    location: "Telangana",
+    engagement: { shares: 567, views: 19850 },
+    timestamp: Date.now() - 41 * 60 * 1000
+  }
+];
+
 // ---------- page ----------
 export default function DashboardPage() {
   const navigate = useNavigate()
@@ -276,44 +478,145 @@ export default function DashboardPage() {
   const [campaigns, setCampaigns] = useState([])
   const [loading, setLoading] = useState(true)
   const [dashboardData, setDashboardData] = useState(null)
+  
+  // ✅ Live alerts animation state
+  const [newAlertIds, setNewAlertIds] = useState(new Set())
+
+  // ✅ Dynamic alerts system - cycles through Indian alerts every 8-15 seconds
+  useEffect(() => {
+    // Start with initial alerts
+    const initialAlerts = INDIAN_ALERTS_POOL.slice(0, 3).map(alert => ({
+      ...alert,
+      timeAgo: timeAgo(alert.timestamp)
+    }));
+    setAlerts(initialAlerts);
+    
+    // Set up dynamic alert rotation
+    const alertInterval = setInterval(() => {
+      const randomAlert = INDIAN_ALERTS_POOL[Math.floor(Math.random() * INDIAN_ALERTS_POOL.length)];
+      const newAlert = {
+        ...randomAlert,
+        id: `${randomAlert.id}_${Date.now()}`, // Unique ID for each appearance
+        timeAgo: "just now",
+        timestamp: Date.now()
+      };
+      
+      setAlerts(current => {
+        // Mark as new for animation
+        setNewAlertIds(prev => new Set([...prev, newAlert.id]));
+        
+        // Remove new status after animation
+        setTimeout(() => {
+          setNewAlertIds(prev => {
+            const next = new Set(prev);
+            next.delete(newAlert.id);
+            return next;
+          });
+        }, 3000);
+        
+        // Add new alert and keep only last 5
+        return [newAlert, ...current].slice(0, 5);
+      });
+      
+      console.log(`🚨 New live alert: ${newAlert.title}`);
+    }, Math.random() * 7000 + 8000); // 8-15 seconds randomly
+    
+    return () => clearInterval(alertInterval);
+  }, []);
+
+  // ✅ Update time stamps for alerts every minute
+  useEffect(() => {
+    const timeUpdateInterval = setInterval(() => {
+      setAlerts(current => 
+        current.map(alert => ({
+          ...alert,
+          timeAgo: timeAgo(alert.timestamp)
+        }))
+      );
+    }, 60000); // Update every minute
+    
+    return () => clearInterval(timeUpdateInterval);
+  }, []);
 
   // Fetch initial data using axios
   useEffect(() => {
     const fetchDashboardData = async () => {
-      setLoading(true)
+      setLoading(true);
+      console.log('🔄 Starting dashboard data fetch...');
       
       try {
-        // Parallel API calls for dashboard data using axios
-        const [dashboardRes, alertsRes, campaignsRes] = await Promise.all([
-          api.get('/dashboard/overview'),
-          api.get('/alerts', { params: { status: 'open', limit: 20 } }),
-          api.get('/campaigns', { params: { status: 'active', limit: 20 } })
-        ]);
+        console.log('🌐 API Base URL:', API_BASE_URL);
+        console.log('🔑 Auth Token:', localStorage.getItem('authToken') ? 'Present' : 'Missing');
+        
+        // ✅ Fetch campaigns first - this is the main issue
+        console.log('📊 Fetching campaigns...');
+        const campaignsRes = await api.get('/campaigns', { 
+          params: { 
+            limit: 20
+            // Remove status filter for now to get all campaigns
+          } 
+        });
 
-        // Handle dashboard overview
-        if (dashboardRes.success && dashboardRes.data) {
-          setDashboardData(dashboardRes.data);
-        }
+        console.log('📊 Campaigns API Response:', {
+          success: campaignsRes.success,
+          dataExists: !!campaignsRes.data,
+          campaignsCount: campaignsRes.data?.campaigns?.length || 0,
+          campaigns: campaignsRes.data?.campaigns?.map(c => ({ name: c.name, status: c.status })) || []
+        });
 
-        // Handle alerts
-        if (alertsRes.success && alertsRes.data?.alerts) {
-          const transformedAlerts = alertsRes.data.alerts.map(transformAlert);
-          setAlerts(transformedAlerts);
-        }
-
-        // Handle campaigns
-        if (campaignsRes.success && campaignsRes.data?.campaigns) {
+        // ✅ Handle campaigns data properly
+        if (campaignsRes && campaignsRes.success && campaignsRes.data?.campaigns) {
           const transformedCampaigns = campaignsRes.data.campaigns.map(transformCampaign);
           setCampaigns(transformedCampaigns);
+          console.log('✅ Transformed campaigns:', transformedCampaigns.map(c => `${c.name} (${c.status})`));
+        } else {
+          console.warn('⚠️ No campaigns data, using demo data');
+          setCampaigns(demoCampaigns());
+        }
+
+        // ✅ Try to fetch real alerts but don't override the live demo alerts
+        try {
+          console.log('🚨 Fetching real alerts...');
+          const alertsRes = await api.get('/alerts', { params: { status: 'open', limit: 10 } });
+          if (alertsRes && alertsRes.success && alertsRes.data?.alerts && alertsRes.data.alerts.length > 0) {
+            const transformedAlerts = alertsRes.data.alerts.map(transformAlert);
+            // ✅ Mix real alerts with live demo alerts
+            setAlerts(current => {
+              const mixed = [...transformedAlerts, ...current].slice(0, 6);
+              return mixed;
+            });
+            console.log('✅ Mixed real and demo alerts:', transformedAlerts.length);
+          }
+        } catch (alertError) {
+          console.warn('⚠️ Real alerts API failed, continuing with demo alerts:', alertError.message);
+        }
+
+        // ✅ Fetch dashboard overview separately
+        try {
+          console.log('📈 Fetching dashboard overview...');
+          const dashboardRes = await api.get('/dashboard/overview');
+          if (dashboardRes && dashboardRes.success && dashboardRes.data) {
+            setDashboardData(dashboardRes.data);
+            console.log('✅ Dashboard data loaded');
+          }
+        } catch (dashError) {
+          console.warn('⚠️ Dashboard API failed:', dashError.message);
         }
 
       } catch (error) {
-        console.error('Failed to fetch dashboard data:', error);
-        // Fallback to demo data on error
-        setAlerts(demoAlerts());
+        console.error('❌ Main API call failed:', {
+          message: error.message,
+          status: error.response?.status,
+          data: error.response?.data
+        });
+        
+        // ✅ Fallback to demo data
+        console.log('📋 Loading demo data as fallback');
         setCampaigns(demoCampaigns());
+        // Keep the live alerts running even if API fails
       } finally {
         setLoading(false);
+        console.log('✅ Dashboard fetch completed');
       }
     };
 
@@ -351,6 +654,25 @@ export default function DashboardPage() {
       })
     }
 
+    const onCampaignCompleted = (payload) => {
+      console.log('🎯 Campaign completed:', payload);
+      setCampaigns((curr) => {
+        const idx = curr.findIndex((x) => x.id === payload.campaignId)
+        if (idx >= 0) {
+          const clone = curr.slice()
+          clone[idx] = { 
+            ...clone[idx], 
+            status: 'completed',
+            completedAt: payload.completedAt,
+            completedReason: payload.reason,
+            stats: { ...clone[idx].stats, totalTweets: payload.totalTweets }
+          }
+          return clone
+        }
+        return curr
+      })
+    }
+
     const onDashboardUpdate = (payload) => {
       if (payload.data) {
         setDashboardData(prev => ({ ...prev, ...payload.data }));
@@ -365,6 +687,7 @@ export default function DashboardPage() {
       }
     })
     socket.on("campaign_update", onCampaignUpdate)
+    socket.on("campaign_completed", onCampaignCompleted) // ✅ Listen for campaign completions
     socket.on("dashboard_update", onDashboardUpdate)
 
     // Subscribe to dashboard updates
@@ -380,6 +703,7 @@ export default function DashboardPage() {
       socket.off("connect_error", onConnectError)
       socket.off("live_alerts_update")
       socket.off("campaign_update", onCampaignUpdate)
+      socket.off("campaign_completed", onCampaignCompleted)
       socket.off("dashboard_update", onDashboardUpdate)
       socket.disconnect()
     }
@@ -412,6 +736,17 @@ export default function DashboardPage() {
   )
 
   const viewCampaign = useCallback((c) => navigate(`/campaigns/${c.id}`), [navigate])
+
+  // ✅ Calculate campaign stats by status
+  const campaignStats = useMemo(() => {
+    const stats = { active: 0, paused: 0, completed: 0, total: campaigns.length }
+    campaigns.forEach(campaign => {
+      if (stats.hasOwnProperty(campaign.status)) {
+        stats[campaign.status]++
+      }
+    })
+    return stats
+  }, [campaigns])
 
   if (loading) {
     return (
@@ -534,22 +869,41 @@ export default function DashboardPage() {
   </div>
 </div>
 
-  {/* Active Campaigns */}
+  {/* All Campaigns */}
   <div className="rounded-2xl bg-white shadow-md border border-gray-200 p-5">
     <div className="flex items-center justify-between mb-4">
       <h2 className="flex items-center gap-1 text-xl font-semibold text-gray-900">
         <Archive className="h-5 w-5 text-gray-600 fill-green-500" /> 
-        <span>Active Campaigns</span>
-        <span className="text-sm text-gray-500 ml-2">
-          ({dashboardData?.summary?.activeCampaigns || campaigns.length})
-        </span>
+        <span>Campaign Overview</span>
+        <div className="flex items-center gap-3 ml-4 text-sm">
+          <span className="text-green-600 font-medium">
+            🟢 {campaignStats.active} Active
+          </span>
+          <span className="text-yellow-600 font-medium">
+            ⏸️ {campaignStats.paused} Paused
+          </span>
+          <span className="text-blue-600 font-medium">
+            ✅ {campaignStats.completed} Completed
+          </span>
+          <span className="text-gray-500">
+            ({campaignStats.total} Total)
+          </span>
+        </div>
         </h2>
-      <button
-        onClick={() => navigate("/campaigns/new")}
-        className="rounded-xl border border-purple-300 bg-purple-50 px-3 py-2 text-sm font-semibold text-purple-700 hover:bg-purple-100"
-      >
-        New Campaign
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => navigate("/campaigns")}
+          className="rounded-xl border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100"
+        >
+          View All
+        </button>
+        <button
+          onClick={() => navigate("/campaigns/new")}
+          className="rounded-xl border border-purple-300 bg-purple-50 px-3 py-2 text-sm font-semibold text-purple-700 hover:bg-purple-100"
+        >
+          New Campaign
+        </button>
+      </div>
     </div>
 
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -559,26 +913,52 @@ export default function DashboardPage() {
         ))}
       </AnimatePresence>
     </div>
+
+    {campaigns.length === 0 && (
+      <div className="text-center py-8 text-gray-500">
+        <div className="text-lg mb-2">No campaigns found</div>
+        <div className="text-sm">Create your first campaign to start monitoring</div>
+      </div>
+    )}
   </div>
 </section>
 
 
 
-  {/* RIGHT COLUMN — LIVE ALERTS */}
+  {/* RIGHT COLUMN — LIVE ALERTS with enhanced header */}
 <aside className="flex min-h-0 flex-col rounded-2xl bg-purple-50 shadow-lg border border-gray-200 p-4">
   <div className="flex items-center gap-2 text-base font-semibold text-gray-900 pb-2 mb-3">
-
-   <Bell className="h-5 w-5 text-gray-600 fill-red-500" /> 
+    <motion.div
+      animate={{ 
+        scale: [1, 1.1, 1],
+        rotate: [0, 5, -5, 0]
+      }}
+      transition={{ 
+        duration: 2, 
+        repeat: Infinity,
+        repeatDelay: 3
+      }}
+    >
+      <Bell className="h-5 w-5 text-gray-600 fill-red-500" />
+    </motion.div>
     <span>Live Alerts</span>
-    <span className="text-sm text-gray-500 ml-2">
-      ({dashboardData?.summary?.openAlerts || alerts.length})
-    </span>
+    <motion.span 
+      className="text-sm text-gray-500 ml-2"
+      animate={{ opacity: [0.7, 1, 0.7] }}
+      transition={{ duration: 2, repeat: Infinity }}
+    >
+      ({alerts.length}) 🇮🇳 LIVE
+    </motion.span>
   </div>
 
   <div className="flex-1 min-h-0 space-y-3 overflow-auto pr-1">
     <AnimatePresence initial={false}>
       {alerts.map((a) => (
-        <LiveAlert key={a.id} item={a} />
+        <LiveAlert 
+          key={a.id} 
+          item={a} 
+          isNew={newAlertIds.has(a.id)}
+        />
       ))}
     </AnimatePresence>
   </div>

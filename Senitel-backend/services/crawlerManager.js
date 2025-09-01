@@ -15,7 +15,6 @@ class CrawlerManager {
     this.socketService = null;
     this.autoInitStarted = false;
     this.aiProcessingService = new AIProcessingService();
-    
   }
 
   // Set socket service reference
@@ -210,6 +209,22 @@ class CrawlerManager {
 
   async startCampaignCrawling(campaign) {
     try {
+      // ✅ CHECK IF CAMPAIGN IS ALREADY COMPLETED OR HAS TOO MANY TWEETS
+      if (campaign.status === 'completed') {
+        console.log(`⏹️ Campaign "${campaign.name}" is already completed - skipping crawl setup`);
+        return false;
+      }
+      
+      if (campaign.stats && campaign.stats.totalTweets >= 200) {
+        console.log(`🎯 Campaign "${campaign.name}" has ${campaign.stats.totalTweets} tweets - marking as completed`);
+        await Campaign.findByIdAndUpdate(campaign._id, {
+          status: 'completed',
+          completedAt: new Date(),
+          completedReason: 'Reached maximum tweet target (200+)'
+        });
+        return false;
+      }
+
       // Wait for initialization and login if not ready
       if (!this.isInitialized) {
         console.log(`⏳ Waiting for crawler initialization for campaign: ${campaign.name}`);
@@ -289,6 +304,15 @@ class CrawlerManager {
 
   async performCrawl(campaign) {
     try {
+      // ✅ CHECK IF CAMPAIGN IS COMPLETED BEFORE STARTING CRAWL
+      const currentCampaign = await Campaign.findById(campaign._id);
+      if (!currentCampaign || currentCampaign.status === 'completed' || 
+          (currentCampaign.stats && currentCampaign.stats.totalTweets >= 200)) {
+        console.log(`⏹️ Campaign "${campaign.name}" is completed - stopping crawl`);
+        this.stopCampaignCrawling(campaign._id);
+        return;
+      }
+
       // Check if crawler is still ready
       if (!this.isInitialized || !this.crawlerInstance?.isLoggedIn) {
         console.log(`⚠️ Crawler not ready for crawl of campaign: ${campaign.name}`);
@@ -299,18 +323,27 @@ class CrawlerManager {
       
       console.log(`🔍 Crawling for campaign: ${campaign.name} (topic: ${campaign.topic})`);
       
-      // Use keywords and hashtags to build search queries
+      // Use keywords and hashtags to build search queries - LIMIT TO 3 KEYWORDS MAX
       const searchQueries = [
         campaign.topic,
-        ...(campaign.keywords || []).slice(0, 3), // Limit to avoid API limits
-        ...(campaign.hashtags || []).slice(0, 2)
-      ].filter(Boolean);
+        ...(campaign.keywords || []).slice(0, 3), // ✅ Limit to 3 keywords to avoid API limits
+        ...(campaign.hashtags || []).slice(0, 2)  // ✅ Limit to 2 hashtags
+      ].filter(Boolean).slice(0, 5); // ✅ Max 5 total search terms
 
       let totalNewTweets = 0;
       const allNewTweets = [];
 
       for (const query of searchQueries) {
         try {
+          // ✅ CHECK BEFORE EACH KEYWORD IF CAMPAIGN IS COMPLETED
+          const latestCampaign = await Campaign.findById(campaign._id);
+          if (!latestCampaign || latestCampaign.status === 'completed' || 
+              (latestCampaign.stats && latestCampaign.stats.totalTweets >= 200)) {
+            console.log(`🛑 Campaign "${campaign.name}" completed during crawl - stopping`);
+            this.stopCampaignCrawling(campaign._id);
+            break;
+          }
+
           // ✅ Pass campaignId to crawlTopic
           const result = await this.crawlerInstance.crawlTopic(
             query, 
@@ -332,9 +365,17 @@ class CrawlerManager {
         }
       }
 
-      // Trigger AI processing for new tweets if any were found
+      // ✅ UPDATE CAMPAIGN STATS AND CHECK FOR COMPLETION
       if (totalNewTweets > 0) {
         console.log(`✅ Crawl completed for ${campaign.name}: ${totalNewTweets} new tweets`);
+        
+        // Update stats and check if campaign was completed
+        const campaignCompleted = await this.updateCampaignStats(campaign._id, totalNewTweets, allNewTweets);
+        
+        if (campaignCompleted) {
+          console.log(`🎯 Campaign "${campaign.name}" completed after this crawl - stopping all further crawls`);
+          return; // Exit early if campaign completed
+        }
         
         // Trigger AI processing after a brief delay
         setTimeout(async () => {
@@ -346,9 +387,6 @@ class CrawlerManager {
           }
         }, 5000); // Process after 5 seconds
       }
-
-      // Update campaign stats
-      await this.updateCampaignStats(campaign._id, totalNewTweets, allNewTweets);
 
       // Update crawler info
       const crawlerInfo = this.activeCrawlers.get(campaign._id.toString());
@@ -389,10 +427,10 @@ class CrawlerManager {
 
   async updateCampaignStats(campaignId, newTweets, tweets) {
     try {
-      if (newTweets === 0) return;
+      if (newTweets === 0) return false;
 
       const campaign = await Campaign.findById(campaignId);
-      if (!campaign) return;
+      if (!campaign) return false;
 
       // Initialize stats if not present
       if (!campaign.stats) {
@@ -401,8 +439,10 @@ class CrawlerManager {
           realPosts: 0,
           fakePosts: 0,
           propagandaPosts: 0,
+          pendingPosts: 0,
           totalEngagement: 0,
           avgSentiment: 0,
+          alertsGenerated: 0,
           lastCrawled: null
         };
       }
@@ -448,11 +488,52 @@ class CrawlerManager {
         campaign.stats.avgSentiment = ((campaign.stats.avgSentiment || 0) + newAvgSentiment) / 2;
       }
 
+      // ✅ CHECK IF CAMPAIGN REACHED 200+ TWEETS - MARK AS COMPLETED
+      if (campaign.stats.totalTweets >= 200 && campaign.status === 'active') {
+        console.log(`🎯 Campaign "${campaign.name}" reached ${campaign.stats.totalTweets} tweets - marking as completed`);
+        
+        campaign.status = 'completed';
+        campaign.completedAt = new Date();
+        campaign.completedReason = 'Reached maximum tweet target (200+)';
+        
+        // Stop crawling for this campaign immediately
+        if (this.crawlIntervals.has(campaignId.toString())) {
+          clearInterval(this.crawlIntervals.get(campaignId.toString()));
+          this.crawlIntervals.delete(campaignId.toString());
+          console.log(`🛑 Stopped crawling interval for campaign: ${campaign.name}`);
+        }
+        
+        // Remove from active crawlers
+        if (this.activeCrawlers.has(campaignId.toString())) {
+          this.activeCrawlers.delete(campaignId.toString());
+          console.log(`🗑️ Removed campaign from active crawlers: ${campaign.name}`);
+        }
+        
+        // Send completion notification
+        if (this.socketService && typeof this.socketService.broadcast === 'function') {
+          this.socketService.broadcast('campaign_completed', {
+            campaignId: campaign._id,
+            campaignName: campaign.name,
+            totalTweets: campaign.stats.totalTweets,
+            completedAt: campaign.completedAt,
+            reason: campaign.completedReason
+          });
+        }
+        
+        console.log(`✅ Campaign "${campaign.name}" completed with ${campaign.stats.totalTweets} tweets`);
+        
+        await campaign.save();
+        return true; // ✅ Return true if campaign was completed
+      }
+
       await campaign.save();
-      console.log(`📊 Updated stats for campaign ${campaign.name}: +${newTweets} tweets`);
+      console.log(`📊 Updated stats for campaign ${campaign.name}: +${newTweets} tweets (Total: ${campaign.stats.totalTweets})`);
+
+      return false; // ✅ Return false if campaign is still active
 
     } catch (error) {
       console.error('❌ Failed to update campaign stats:', error);
+      return false;
     }
   }
 
@@ -532,15 +613,20 @@ class CrawlerManager {
 
   async startExistingCampaigns() {
     try {
+      // ✅ Only start campaigns that are active AND have less than 200 tweets
       const activeCampaigns = await Campaign.find({ 
         status: 'active', 
-        isArchived: false 
+        isArchived: false,
+        $or: [
+          { 'stats.totalTweets': { $lt: 200 } },
+          { 'stats.totalTweets': { $exists: false } }
+        ]
       }).limit(2);  // ✅ Limit to 2 campaigns max
     
       console.log(`🔄 Found ${activeCampaigns.length} active campaigns (limited to 2 for stability)`);
     
       if (activeCampaigns.length === 0) {
-        console.log('❌ No active campaigns found');
+        console.log('❌ No active campaigns found that need crawling');
         return;
       }
 
